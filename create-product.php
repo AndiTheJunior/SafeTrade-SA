@@ -51,8 +51,10 @@ include 'includes/header.php';
     <h2>Create Product</h2>
 
     <form
+       
         method="POST"
-        enctype="multipart/form-data">
+        enctype="multipart/form-data"
+        onsubmit="return validateProductForm()">
 
         <input
             type="text"

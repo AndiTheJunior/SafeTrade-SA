@@ -1,5 +1,8 @@
 <?php
 
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 include 'config/database.php';
 
 if(isset($_POST['register']))
@@ -36,7 +39,7 @@ exit();
 ?>
 <h2>Register</h2>
 
-<form method="POST">
+<form method="POST" onsubmit="return validateRegisterForm()">
 
 <input type="text"
 name="fullname"

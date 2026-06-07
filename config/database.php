@@ -1,14 +1,13 @@
 <?php
 
-$host = "localhost";
-$dbname = "safetrade";
-$user = "root";
-$pass = "mysql";
-
+$host = "sql102.infinityfree.com";
+$dbname = "if0_42118699_safetrade";
+$user = "if0_42118699";
+$pass = "TNgjox6Nbwz5jV";
 try {
 
     $pdo = new PDO(
-        "mysql:host=$host;dbname=$dbname",
+        "mysql:host=$host;dbname=$dbname;charset=utf8mb4",
         $user,
         $pass
     );
@@ -23,3 +22,4 @@ try {
     die("Connection Failed: " . $e->getMessage());
 
 }
+?>

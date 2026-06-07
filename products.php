@@ -72,6 +72,13 @@ Filter
 Marketplace
 </h2>
 
+<input
+type="text"
+id="searchInput"
+onkeyup="searchProducts()"
+placeholder="Search products..."
+style="width:100%;padding:10px;margin-bottom:20px;">
+
 <div class="products">
 
 <?php
