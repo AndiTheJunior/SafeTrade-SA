@@ -1,3 +1,4 @@
+
 <?php
 
 error_reporting(E_ALL);
@@ -19,8 +20,8 @@ PASSWORD_DEFAULT
 
 $sql =
 "INSERT INTO users
-(fullname,email,phone,password)
-VALUES (?,?,?,?)";
+(fullname,email,phone,password,role)
+VALUES (?,?,?,?,?)";
 
 $stmt = $pdo->prepare($sql);
 
@@ -28,7 +29,8 @@ $stmt->execute([
 $fullname,
 $email,
 $phone,
-$password
+$password,
+'buyer'
 ]);
 
 header("Location: login.php");
@@ -74,3 +76,4 @@ Register
 </div>
 
 <?php include 'includes/header.php'; ?>
+

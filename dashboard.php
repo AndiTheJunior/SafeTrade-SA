@@ -21,9 +21,15 @@ You are successfully logged in.
 
 </p>
 
+<?php if($_SESSION['role'] === 'seller'): ?>
+
 <a href="create-product.php">
 Add Product
 </a>
+
+<br><br>
+
+<?php endif; ?>
 
 <br><br>
 

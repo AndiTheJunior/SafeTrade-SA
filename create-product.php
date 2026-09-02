@@ -1,7 +1,10 @@
 <?php
 
 include 'includes/auth.php';
+include 'includes/role-auth.php';
 include 'config/database.php';
+
+requireRole('seller');
 
 if(isset($_POST['create']))
 {
