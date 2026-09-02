@@ -29,6 +29,12 @@ Add Product
 
 <br><br>
 
+<a href="my-products.php">
+My Products
+</a>
+
+<br><br>
+
 <?php endif; ?>
 
 <br><br>
