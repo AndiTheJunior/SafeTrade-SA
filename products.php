@@ -21,7 +21,7 @@ if(isset($_GET['search']))
  * while still using prepared statements.
  */
 
-$sql = "SELECT * FROM products WHERE 1=1";
+$sql = "SELECT * FROM products WHERE status = 'active'";
 
 $params = [];
 

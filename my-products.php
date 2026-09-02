@@ -85,6 +85,22 @@ Status:
 <?= htmlspecialchars($product['status']); ?>
 </p>
 
+<?php if($product['status'] === 'active'): ?>
+
+<a href="update-product-status.php?id=<?= $product['id']; ?>"
+   onclick="return confirm('Mark this product as sold?');">
+Mark as Sold
+</a>
+
+<?php else: ?>
+
+<a href="update-product-status.php?id=<?= $product['id']; ?>"
+   onclick="return confirm('Mark this product as active again?');">
+Mark as Active
+</a>
+
+<?php endif; ?>
+
 <a href="product-details.php?id=<?= $product['id']; ?>">
 View Details
 </a>
