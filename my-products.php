@@ -89,6 +89,12 @@ Status:
 View Details
 </a>
 
+<br><br>
+
+<a href="edit-product.php?id=<?= $product['id']; ?>">
+Edit Product
+</a>
+
 </div>
 
 <br>
