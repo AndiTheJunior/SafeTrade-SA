@@ -95,6 +95,13 @@ View Details
 Edit Product
 </a>
 
+<br><br>
+
+<a href="delete-product.php?id=<?= $product['id']; ?>"
+   onclick="return confirm('Are you sure you want to delete this product?');">
+Delete Product
+</a>
+
 </div>
 
 <br>
