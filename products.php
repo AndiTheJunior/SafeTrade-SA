@@ -4,126 +4,175 @@ include 'config/database.php';
 include 'includes/header.php';
 
 $category = '';
+$search = '';
 
 if(isset($_GET['category']))
 {
-    $category = $_GET['category'];
+    $category = trim($_GET['category']);
 }
+
+if(isset($_GET['search']))
+{
+    $search = trim($_GET['search']);
+}
+
+/*
+ * Build the marketplace query dynamically
+ * while still using prepared statements.
+ */
+
+$sql = "SELECT * FROM products WHERE 1=1";
+
+$params = [];
 
 if($category != '')
 {
-    $stmt = $pdo->prepare(
-        "SELECT * FROM products
-         WHERE category = ?
-         ORDER BY id DESC"
-    );
-
-    $stmt->execute([$category]);
-
-    $products = $stmt;
+    $sql .= " AND category = ?";
+    $params[] = $category;
 }
-else
+
+if($search != '')
 {
-    $products = $pdo->query(
-        "SELECT * FROM products
-         ORDER BY id DESC"
-    );
+    $sql .= " AND (
+        title LIKE ?
+        OR description LIKE ?
+        OR category LIKE ?
+        OR location LIKE ?
+    )";
+
+    $searchTerm = "%" . $search . "%";
+
+    $params[] = $searchTerm;
+    $params[] = $searchTerm;
+    $params[] = $searchTerm;
+    $params[] = $searchTerm;
 }
+
+$sql .= " ORDER BY id DESC";
+
+$stmt = $pdo->prepare($sql);
+
+$stmt->execute($params);
+
+$products = $stmt;
 
 ?>
 
+<h2 style="padding:20px;">
+Marketplace
+</h2>
+
 <form method="GET" style="padding:20px;">
 
-<select name="category">
+<input
+type="text"
+name="search"
+value="<?= htmlspecialchars($search); ?>"
+placeholder="Search products..."
+style="width:100%;padding:10px;margin-bottom:10px;"
+>
+
+<select
+name="category"
+style="padding:10px;margin-bottom:10px;"
+>
 
 <option value="">
 All Categories
 </option>
 
-<option value="Electronics">
+<option value="Electronics"
+<?= $category === 'Electronics' ? 'selected' : ''; ?>>
 Electronics
 </option>
 
-<option value="Fashion">
+<option value="Fashion"
+<?= $category === 'Fashion' ? 'selected' : ''; ?>>
 Fashion
 </option>
 
-<option value="Vehicles">
+<option value="Vehicles"
+<?= $category === 'Vehicles' ? 'selected' : ''; ?>>
 Vehicles
 </option>
 
-<option value="Property">
+<option value="Property"
+<?= $category === 'Property' ? 'selected' : ''; ?>>
 Property
 </option>
 
-<option value="Services">
+<option value="Services"
+<?= $category === 'Services' ? 'selected' : ''; ?>>
 Services
 </option>
 
 </select>
 
 <button type="submit">
-Filter
+Search / Filter
 </button>
 
+<a href="products.php">
+Clear
+</a>
+
 </form>
-
-<h2 style="padding:20px;">
-Marketplace
-</h2>
-
-<input
-type="text"
-id="searchInput"
-onkeyup="searchProducts()"
-placeholder="Search products..."
-style="width:100%;padding:10px;margin-bottom:20px;">
 
 <div class="products">
 
 <?php
-while(
-$product =
-$products->fetch()
-)
+
+if($products->rowCount() == 0)
+{
+?>
+
+<p style="padding:20px;">
+No products found.
+</p>
+
+<?php
+}
+
+while($product = $products->fetch())
 {
 ?>
 
 <div class="card">
 
+<?php if(!empty($product['image'])): ?>
+
 <img
-src="uploads/products/<?=
-$product['image']
-?>">
+src="uploads/products/<?= htmlspecialchars($product['image']); ?>"
+>
+
+<?php endif; ?>
 
 <h3>
-<?= $product['title']; ?>
+<?= htmlspecialchars($product['title']); ?>
 </h3>
 
 <p>
-R<?= $product['price']; ?>
+R<?= htmlspecialchars($product['price']); ?>
 </p>
 
 <p>
 Category:
-<?= $product['category']; ?>
+<?= htmlspecialchars($product['category']); ?>
 </p>
 
 <p>
-<?= $product['location']; ?>
+<?= htmlspecialchars($product['location']); ?>
 </p>
 
-<a href=
-"product-details.php?id=
-<?= $product['id']; ?>">
-
+<a href="product-details.php?id=<?= (int)$product['id']; ?>">
 View Details
-
 </a>
 
 </div>
 
-<?php } ?>
+<?php
+}
+?>
 
 </div>
 
