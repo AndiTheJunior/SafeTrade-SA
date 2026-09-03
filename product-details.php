@@ -120,6 +120,154 @@ Seller:
 <?= htmlspecialchars($product['seller_name']); ?>
 </p>
 
+<?php
+
+$reviewStmt = $pdo->prepare(
+    "SELECT
+        AVG(rating) AS average_rating,
+        COUNT(*) AS review_count
+     FROM reviews
+     WHERE seller_id = ?"
+);
+
+$reviewStmt->execute([
+    $product['user_id']
+]);
+
+$reviewSummary = $reviewStmt->fetch();
+
+?>
+
+<p>
+
+Rating:
+
+<?php
+
+if($reviewSummary['review_count'] > 0)
+{
+    $averageRating = round($reviewSummary['average_rating']);
+
+for($i = 1; $i <= 5; $i++)
+{
+    if($i <= $averageRating)
+    {
+        echo "⭐";
+    }
+    else
+    {
+        echo "☆";
+    }
+}
+
+echo " ";
+echo number_format($reviewSummary['average_rating'], 1);
+echo "/5 ";
+
+echo "(" . $reviewSummary['review_count'];
+
+if($reviewSummary['review_count'] == 1)
+{
+    echo " review)";
+}
+else
+{
+    echo " review)";
+}
+}
+else
+{
+    echo "No reviews yet";
+}
+
+?>
+
+</p>
+
+<hr>
+
+<h3>
+Reviews
+</h3>
+
+<?php
+
+$reviewsStmt = $pdo->prepare(
+    "SELECT reviews.*,
+            users.fullname AS reviewer_name
+     FROM reviews
+     INNER JOIN users
+        ON reviews.reviewer_id = users.id
+     WHERE reviews.product_id = ?
+     ORDER BY reviews.created_at DESC"
+);
+
+$reviewsStmt->execute([
+    $product['id']
+]);
+
+$reviews = $reviewsStmt;
+
+if($reviews->rowCount() == 0)
+{
+?>
+
+<p>
+No reviews yet.
+</p>
+
+<?php
+}
+
+while($review = $reviews->fetch())
+{
+?>
+
+<div class="card">
+
+<p>
+<strong>
+<?= htmlspecialchars($review['reviewer_name']); ?>
+</strong>
+</p>
+
+<p>
+
+<?php
+
+for($i = 1; $i <= 5; $i++)
+{
+    if($i <= $review['rating'])
+    {
+        echo "⭐";
+    }
+    else
+    {
+        echo "☆";
+    }
+}
+
+?>
+
+</p>
+<p>
+<?= htmlspecialchars($review['review']); ?>
+</p>
+
+<p>
+Reviewed:
+<?= htmlspecialchars($review['created_at']); ?>
+</p>
+
+</div>
+
+<br>
+
+<?php
+}
+
+?>
+
 <p>
 Status:
 <?= htmlspecialchars($product['status']); ?>

@@ -139,6 +139,12 @@ while($firstMessage = $messages->fetch());
 
 <br>
 
+<a href="review-seller.php?product_id=<?= (int)$product_id; ?>&seller_id=<?= (int)$other_user_id; ?>">
+Leave a Review
+</a>
+
+<br><br>
+
 <a href="buyer-messages.php">
 Back to Messages
 </a>
