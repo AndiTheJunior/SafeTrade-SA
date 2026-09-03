@@ -35,9 +35,21 @@ My Products
 
 <br><br>
 
-<?php endif; ?>
+<a href="messages.php">
+Messages
+</a>
 
 <br><br>
+
+<?php else: ?>
+
+<a href="buyer-messages.php">
+Messages
+</a>
+
+<br><br>
+
+<?php endif; ?>
 
 <a href="products.php">
 View Marketplace

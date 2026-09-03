@@ -21,24 +21,27 @@ if(isset($_GET['search']))
  * while still using prepared statements.
  */
 
-$sql = "SELECT * FROM products WHERE status = 'active'";
-
+$sql = "SELECT products.*, users.fullname AS seller_name
+        FROM products
+        INNER JOIN users
+            ON products.user_id = users.id
+        WHERE products.status = 'active'";
 $params = [];
 
 if($category != '')
 {
-    $sql .= " AND category = ?";
+    $sql .= " AND products.category = ?";
     $params[] = $category;
 }
 
 if($search != '')
 {
     $sql .= " AND (
-        title LIKE ?
-        OR description LIKE ?
-        OR category LIKE ?
-        OR location LIKE ?
-    )";
+    products.title LIKE ?
+    OR products.description LIKE ?
+    OR products.category LIKE ?
+    OR products.location LIKE ?
+)";
 
     $searchTerm = "%" . $search . "%";
 
@@ -48,7 +51,7 @@ if($search != '')
     $params[] = $searchTerm;
 }
 
-$sql .= " ORDER BY id DESC";
+$sql .= " ORDER BY products.id DESC";
 
 $stmt = $pdo->prepare($sql);
 
@@ -161,7 +164,18 @@ Category:
 </p>
 
 <p>
+Location:
 <?= htmlspecialchars($product['location']); ?>
+</p>
+
+<p>
+Seller:
+<?= htmlspecialchars($product['seller_name']); ?>
+</p>
+
+<p>
+Status:
+<?= htmlspecialchars($product['status']); ?>
 </p>
 
 <a href="product-details.php?id=<?= (int)$product['id']; ?>">
