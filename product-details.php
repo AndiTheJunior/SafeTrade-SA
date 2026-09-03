@@ -46,6 +46,124 @@ $error = "";
 $success = "";
 
 /*
+ * Process a buyer order.
+ */
+if(isset($_POST['place_order']))
+{
+    if($_SESSION['role'] !== 'buyer')
+    {
+        $error = "Only buyers can place orders.";
+    }
+    elseif($isSeller)
+    {
+        $error = "You cannot order your own product.";
+    }
+    else
+    {
+        try
+        {
+            $pdo->beginTransaction();
+
+            /*
+             * Lock the product row while checking its availability.
+             */
+            $orderProductStmt = $pdo->prepare(
+                "SELECT id, user_id, price, status
+                 FROM products
+                 WHERE id = ?
+                 FOR UPDATE"
+            );
+
+            $orderProductStmt->execute([
+                $product['id']
+            ]);
+
+            $orderProduct = $orderProductStmt->fetch();
+
+            if(!$orderProduct)
+            {
+                throw new Exception("Product not found.");
+            }
+
+            if($orderProduct['status'] !== 'active')
+            {
+                throw new Exception("This product is no longer available.");
+            }
+
+            /*
+             * Make sure there is no existing active order.
+             */
+            $existingOrderStmt = $pdo->prepare(
+                "SELECT id
+                 FROM orders
+                 WHERE product_id = ?
+                 AND status IN ('pending', 'accepted')
+                 LIMIT 1"
+            );
+
+            $existingOrderStmt->execute([
+                $product['id']
+            ]);
+
+            if($existingOrderStmt->fetch())
+            {
+                throw new Exception("This product already has an active order.");
+            }
+
+            /*
+             * Create the order using the current product price.
+             */
+            $orderStmt = $pdo->prepare(
+                "INSERT INTO orders
+                (buyer_id, seller_id, product_id, amount, status)
+                VALUES (?, ?, ?, ?, 'pending')"
+            );
+
+            $orderStmt->execute([
+                $_SESSION['user_id'],
+                $orderProduct['user_id'],
+                $orderProduct['id'],
+                $orderProduct['price']
+            ]);
+
+            /*
+             * Mark the product as sold so another buyer
+             * cannot place an order for it.
+             */
+            $updateProductStmt = $pdo->prepare(
+                "UPDATE products
+                 SET status = 'sold'
+                 WHERE id = ?
+                 AND status = 'active'"
+            );
+
+            $updateProductStmt->execute([
+                $product['id']
+            ]);
+
+            if($updateProductStmt->rowCount() !== 1)
+            {
+                throw new Exception("The product is no longer available.");
+            }
+
+            $pdo->commit();
+
+            header("Location: buyer/orders.php");
+            exit();
+        }
+        catch(Exception $e)
+        {
+            if($pdo->inTransaction())
+            {
+                $pdo->rollBack();
+            }
+
+            $error = $e->getMessage();
+        }
+    }
+}
+
+/*
  * Process the message form.
  */
 if(isset($_POST['send_message']))
@@ -305,6 +423,31 @@ Status:
 <?php endif; ?>
 
 <?php if(!$isSeller): ?>
+
+<?php if($_SESSION['role'] === 'buyer'): ?>
+
+<hr>
+
+<h3>
+Buy This Product
+</h3>
+
+<p>
+By placing an order, this product will be reserved for you.
+</p>
+
+<form method="POST">
+
+<button
+type="submit"
+name="place_order"
+onclick="return confirm('Are you sure you want to place this order?');">
+Place Order
+</button>
+
+</form>
+
+<?php endif; ?>
 
 <h3>
 Contact Seller

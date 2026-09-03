@@ -11,7 +11,7 @@ include 'includes/header.php';
 
 Welcome
 
-<?= $_SESSION['fullname']; ?>
+<?= htmlspecialchars($_SESSION['fullname']); ?>
 
 </h2>
 
@@ -41,10 +41,22 @@ Messages
 
 <br><br>
 
+<a href="seller/orders.php">
+Orders
+</a>
+
+<br><br>
+
 <?php else: ?>
 
 <a href="buyer-messages.php">
 Messages
+</a>
+
+<br><br>
+
+<a href="buyer/orders.php">
+My Orders
 </a>
 
 <br><br>
