@@ -1,7 +1,10 @@
 <?php
 
 include 'includes/auth.php';
+include 'includes/role-auth.php';
 include 'config/database.php';
+
+requireRole('buyer');
 
 if(
     !isset($_GET['product_id']) ||
@@ -14,60 +17,37 @@ if(
     exit();
 }
 
-$product_id = $_GET['product_id'];
-$seller_id = $_GET['seller_id'];
-$buyer_id = $_SESSION['user_id'];
+$productId = (int)$_GET['product_id'];
+$sellerId = (int)$_GET['seller_id'];
+$buyerId = (int)$_SESSION['user_id'];
 
 $error = "";
 $success = "";
 
-/*
- * Verify that the buyer has actually
- * communicated with this seller about
- * this product.
- */
-$stmt = $pdo->prepare(
-    "SELECT id
-     FROM messages
-     WHERE product_id = ?
-     AND sender_id = ?
-     AND receiver_id = ?
-     LIMIT 1"
-);
-
-$stmt->execute([
-    $product_id,
-    $buyer_id,
-    $seller_id
-]);
-
-$conversation = $stmt->fetch();
-
-if(!$conversation)
-{
-    header("Location: buyer-messages.php");
-    exit();
-}
 
 /*
- * Get product and seller information.
+ * Verify that this product belongs to the supplied seller.
  */
-$stmt = $pdo->prepare(
+$productStmt = $pdo->prepare(
     "SELECT products.title AS product_title,
             users.fullname AS seller_name
+
      FROM products
+
      INNER JOIN users
         ON products.user_id = users.id
+
      WHERE products.id = ?
-     AND products.user_id = ?"
+     AND products.user_id = ?
+     AND users.role = 'seller'"
 );
 
-$stmt->execute([
-    $product_id,
-    $seller_id
+$productStmt->execute([
+    $productId,
+    $sellerId
 ]);
 
-$product = $stmt->fetch();
+$product = $productStmt->fetch();
 
 if(!$product)
 {
@@ -75,183 +55,297 @@ if(!$product)
     exit();
 }
 
+
 /*
- * Check whether the buyer has already
- * reviewed this seller/product.
+ * A buyer may review only after completing an order
+ * for this exact product and seller.
  */
-$stmt = $pdo->prepare(
+$orderStmt = $pdo->prepare(
     "SELECT id
-     FROM reviews
-     WHERE reviewer_id = ?
+     FROM orders
+
+     WHERE buyer_id = ?
      AND seller_id = ?
      AND product_id = ?
+     AND status = 'completed'
+
      LIMIT 1"
 );
 
-$stmt->execute([
-    $buyer_id,
-    $seller_id,
-    $product_id
+$orderStmt->execute([
+    $buyerId,
+    $sellerId,
+    $productId
 ]);
 
-$existingReview = $stmt->fetch();
+$completedOrder = $orderStmt->fetch();
+
+if(!$completedOrder)
+{
+    header("Location: buyer-messages.php");
+    exit();
+}
+
 
 /*
- * Process review submission.
+ * Check for an existing review.
+ */
+$reviewStmt = $pdo->prepare(
+    "SELECT id
+     FROM reviews
+
+     WHERE reviewer_id = ?
+     AND seller_id = ?
+     AND product_id = ?
+
+     LIMIT 1"
+);
+
+$reviewStmt->execute([
+    $buyerId,
+    $sellerId,
+    $productId
+]);
+
+$existingReview = $reviewStmt->fetch();
+
+
+/*
+ * Process review.
  */
 if(isset($_POST['submit_review']))
 {
     $rating = $_POST['rating'] ?? '';
     $review = trim($_POST['review'] ?? '');
 
-    if(!is_numeric($rating) || $rating < 1 || $rating > 5)
+    if(
+        !is_numeric($rating) ||
+        (int)$rating < 1 ||
+        (int)$rating > 5
+    )
     {
-        $error = "Please select a rating between 1 and 5.";
+        $error =
+            "Please select a rating between 1 and 5.";
     }
-    elseif($review == '')
+    elseif($review === '')
     {
-        $error = "Please write a review.";
+        $error =
+            "Please write a review.";
+    }
+    elseif(strlen($review) > 5000)
+    {
+        $error =
+            "Your review is too long.";
     }
     elseif($existingReview)
     {
-        $error = "You have already reviewed this product.";
+        $error =
+            "You have already reviewed this product.";
     }
     else
     {
-        $stmt = $pdo->prepare(
-            "INSERT INTO reviews
-            (reviewer_id, seller_id, product_id, rating, review)
-            VALUES (?, ?, ?, ?, ?)"
-        );
+        try
+        {
+            $insertStmt = $pdo->prepare(
+                "INSERT INTO reviews
+                (
+                    reviewer_id,
+                    seller_id,
+                    product_id,
+                    rating,
+                    review
+                )
+                VALUES (?, ?, ?, ?, ?)"
+            );
 
-        $stmt->execute([
-            $buyer_id,
-            $seller_id,
-            $product_id,
-            $rating,
-            $review
-        ]);
+            $insertStmt->execute([
+                $buyerId,
+                $sellerId,
+                $productId,
+                (int)$rating,
+                $review
+            ]);
 
-        $success = "Your review was submitted successfully.";
+            $success =
+                "Your review was submitted successfully.";
 
-        $existingReview = true;
+            $existingReview = true;
+        }
+        catch(PDOException $e)
+        {
+            $error =
+                "The review could not be submitted.";
+        }
     }
 }
+
 
 include 'includes/header.php';
 
 ?>
 
-<div class="form-container">
+<div class="review-page">
 
-<h2>
-Leave a Review
-</h2>
+    <div class="page-header">
 
-<p>
-Product:
-<?= htmlspecialchars($product['product_title']); ?>
-</p>
+        <div>
 
-<p>
-Seller:
-<?= htmlspecialchars($product['seller_name']); ?>
-</p>
+            <h1>
+                Leave a Review
+            </h1>
 
-<hr>
+            <p>
+                Share your experience with this SafeTrade seller.
+            </p>
 
-<?php if($error): ?>
+        </div>
 
-<p>
-<?= htmlspecialchars($error); ?>
-</p>
+        <a href="buyer-messages.php" class="secondary-btn">
+            Back to Messages
+        </a>
 
-<?php endif; ?>
+    </div>
 
-<?php if($success): ?>
 
-<p>
-<?= htmlspecialchars($success); ?>
-</p>
+    <div class="review-form-card">
 
-<?php endif; ?>
+        <div class="review-product-summary">
 
-<?php if(!$existingReview): ?>
+            <div>
 
-<form method="POST">
+                <span>
+                    Product
+                </span>
 
-<label>
-Rating:
-</label>
+                <strong>
+                    <?= htmlspecialchars($product['product_title']); ?>
+                </strong>
 
-<br>
+            </div>
 
-<select name="rating" required>
 
-<option value="">
-Select Rating
-</option>
+            <div>
 
-<option value="5">
-5 - Excellent
-</option>
+                <span>
+                    Seller
+                </span>
 
-<option value="4">
-4 - Good
-</option>
+                <strong>
+                    <?= htmlspecialchars($product['seller_name']); ?>
+                </strong>
 
-<option value="3">
-3 - Average
-</option>
+            </div>
 
-<option value="2">
-2 - Poor
-</option>
+        </div>
 
-<option value="1">
-1 - Very Poor
-</option>
 
-</select>
+        <?php if($error): ?>
 
-<br><br>
+            <div class="status-message error">
+                <?= htmlspecialchars($error); ?>
+            </div>
 
-<label>
-Review:
-</label>
+        <?php endif; ?>
 
-<br>
 
-<textarea
-name="review"
-rows="5"
-placeholder="Write your review..."
-style="width:100%;padding:10px;"
-required></textarea>
+        <?php if($success): ?>
 
-<br><br>
+            <div class="status-message success">
+                <?= htmlspecialchars($success); ?>
+            </div>
 
-<button
-type="submit"
-name="submit_review">
-Submit Review
-</button>
+        <?php endif; ?>
 
-</form>
 
-<?php else: ?>
+        <?php if(!$existingReview): ?>
 
-<p>
-You have already reviewed this product.
-</p>
+            <form method="POST" class="review-form">
 
-<?php endif; ?>
+                <div class="form-group">
 
-<br>
+                    <label for="rating">
+                        Rating
+                    </label>
 
-<a href="buyer-messages.php">
-Back to Messages
-</a>
+                    <select
+                        id="rating"
+                        name="rating"
+                        required>
+
+                        <option value="">
+                            Select Rating
+                        </option>
+
+                        <option value="5">
+                            5 - Excellent
+                        </option>
+
+                        <option value="4">
+                            4 - Good
+                        </option>
+
+                        <option value="3">
+                            3 - Average
+                        </option>
+
+                        <option value="2">
+                            2 - Poor
+                        </option>
+
+                        <option value="1">
+                            1 - Very Poor
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label for="review">
+                        Review
+                    </label>
+
+                    <textarea
+                        id="review"
+                        name="review"
+                        rows="6"
+                        maxlength="5000"
+                        placeholder="Describe your experience with the seller..."
+                        required></textarea>
+
+                </div>
+
+
+                <button
+                    type="submit"
+                    name="submit_review"
+                    class="review-submit-btn">
+
+                    Submit Review
+
+                </button>
+
+            </form>
+
+        <?php else: ?>
+
+            <div class="review-complete">
+
+                <h3>
+                    Review Submitted
+                </h3>
+
+                <p>
+                    You have already reviewed this product and seller.
+                </p>
+
+            </div>
+
+        <?php endif; ?>
+
+    </div>
 
 </div>
 

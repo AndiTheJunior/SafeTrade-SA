@@ -1,102 +1,188 @@
 <?php
 
-session_start();
+if(session_status() === PHP_SESSION_NONE)
+{
+    session_start();
+}
 
 include 'config/database.php';
 
+if(isset($_SESSION['user_id']))
+{
+    header("Location: dashboard.php");
+    exit();
+}
+
 $error = "";
+$email = "";
+
+$registrationSuccess =
+    isset($_GET['registered']) &&
+    $_GET['registered'] === '1';
+
 
 if(isset($_POST['login']))
 {
+    $email =
+        strtolower(
+            trim($_POST['email'] ?? '')
+        );
 
-$email = $_POST['email'];
-$password = $_POST['password'];
+    $password =
+        $_POST['password'] ?? '';
 
-$stmt =
-$pdo->prepare(
-"SELECT * FROM users
-WHERE email=?"
-);
 
-$stmt->execute([$email]);
+    if(!filter_var($email, FILTER_VALIDATE_EMAIL))
+    {
+        $error =
+            "Please enter a valid email address.";
+    }
+    elseif($password === '')
+    {
+        $error =
+            "Please enter your password.";
+    }
+    else
+    {
+        $stmt = $pdo->prepare(
+            "SELECT
+                id,
+                fullname,
+                email,
+                password,
+                role
+             FROM users
+             WHERE email = ?
+             LIMIT 1"
+        );
 
-$user =
-$stmt->fetch();
+        $stmt->execute([
+            $email
+        ]);
 
-if(
-$user &&
-password_verify(
-$password,
-$user['password']
-)
-)
-{
+        $user = $stmt->fetch();
 
-$_SESSION['user_id'] =
-$user['id'];
 
-$_SESSION['fullname'] =
-$user['fullname'];
+        if(
+            $user &&
+            password_verify(
+                $password,
+                $user['password']
+            )
+        )
+        {
+            /*
+             * Prevent session fixation.
+             */
+            session_regenerate_id(true);
 
-$_SESSION['role'] =
-$user['role'];
+            $_SESSION['user_id'] =
+                $user['id'];
 
-header(
-"Location: dashboard.php"
-);
+            $_SESSION['fullname'] =
+                $user['fullname'];
 
-exit();
+            $_SESSION['role'] =
+                $user['role'];
 
+            header(
+                "Location: dashboard.php"
+            );
+
+            exit();
+        }
+        else
+        {
+            $error =
+                "Invalid email or password.";
+        }
+    }
 }
-else
-{
 
-$error =
-"Invalid email or password";
 
-}
-
-}
+include 'includes/header.php';
 
 ?>
 
-<?php include 'includes/header.php'; ?>
-
 <div class="form-container">
 
-<h2>Login</h2>
+    <h2>
+        Login
+    </h2>
 
-<?php if($error): ?>
+    <p>
+        Sign in to your SafeTrade SA account.
+    </p>
 
-<p>
-<?= $error ?>
-</p>
 
-<?php endif; ?>
+    <?php if($registrationSuccess): ?>
 
-<form method="POST">
+        <div class="status-message success">
 
-<input
-type="email"
-name="email"
-placeholder="Email"
-required>
+            Your account was created successfully.
+            You can now log in.
 
-<input
-type="password"
-name="password"
-placeholder="Password"
-required>
+        </div>
 
-<button
-type="submit"
-name="login">
+    <?php endif; ?>
 
-Login
 
-</button>
+    <?php if($error): ?>
 
-</form>
+        <div class="status-message error">
+            <?= htmlspecialchars($error); ?>
+        </div>
+
+    <?php endif; ?>
+
+
+    <form method="POST">
+
+        <label for="email">
+            Email Address
+        </label>
+
+        <input
+            type="email"
+            id="email"
+            name="email"
+            value="<?= htmlspecialchars($email); ?>"
+            placeholder="Email"
+            required
+        >
+
+
+        <label for="password">
+            Password
+        </label>
+
+        <input
+            type="password"
+            id="password"
+            name="password"
+            placeholder="Password"
+            required
+        >
+
+
+        <button
+            type="submit"
+            name="login">
+
+            Login
+
+        </button>
+
+    </form>
+
+
+    <p>
+        Don't have an account?
+
+        <a href="register.php">
+            Create Account
+        </a>
+    </p>
 
 </div>
 

@@ -1,26 +1,34 @@
 <?php
 
 include 'includes/auth.php';
+include 'includes/role-auth.php';
 include 'config/database.php';
 
+requireRole('buyer');
+
 /*
- * Get conversations involving the currently
- * logged-in buyer.
+ * Get all messages involving the logged-in buyer.
  */
 $stmt = $pdo->prepare(
     "SELECT messages.*,
             sender.fullname AS sender_name,
             receiver.fullname AS receiver_name,
             products.title AS product_title
+
      FROM messages
+
      INNER JOIN users AS sender
         ON messages.sender_id = sender.id
+
      INNER JOIN users AS receiver
         ON messages.receiver_id = receiver.id
+
      INNER JOIN products
         ON messages.product_id = products.id
+
      WHERE messages.sender_id = ?
         OR messages.receiver_id = ?
+
      ORDER BY messages.created_at DESC"
 );
 
@@ -35,74 +43,121 @@ include 'includes/header.php';
 
 ?>
 
-<div class="form-container">
+<div class="messages-page">
 
-<h2>
-My Messages
-</h2>
+    <div class="page-header">
 
-<?php
+        <div>
 
-if($messages->rowCount() == 0)
-{
-?>
+            <h1>
+                My Messages
+            </h1>
 
-<p>
-You have no messages yet.
-</p>
+            <p>
+                View your conversations with SafeTrade sellers.
+            </p>
 
-<?php
-}
+        </div>
 
-while($message = $messages->fetch())
-{
-?>
+        <a href="dashboard.php" class="secondary-btn">
+            Back to Dashboard
+        </a>
 
-<div class="card">
+    </div>
 
-<h3>
-<?= htmlspecialchars($message['product_title']); ?>
-</h3>
 
-<p>
-From:
-<?= htmlspecialchars($message['sender_name']); ?>
-</p>
+    <?php if($messages->rowCount() == 0): ?>
 
-<p>
-To:
-<?= htmlspecialchars($message['receiver_name']); ?>
-</p>
+        <div class="empty-state">
 
-<p>
-<?= htmlspecialchars($message['message']); ?>
-</p>
+            <h3>
+                No Messages
+            </h3>
 
-<p>
-Sent:
-<?= htmlspecialchars($message['created_at']); ?>
-</p>
+            <p>
+                You have not started any seller conversations yet.
+            </p>
 
-<a href="buyer-conversation.php?product_id=<?= (int)$message['product_id']; ?>&user_id=<?= (int)(
-    $message['sender_id'] == $_SESSION['user_id']
-    ? $message['receiver_id']
-    : $message['sender_id']
-); ?>">
-View Conversation
-</a>
+            <a href="products.php" class="btn">
+                Browse Marketplace
+            </a>
 
-</div>
+        </div>
 
-<br>
+    <?php else: ?>
 
-<?php
-}
+        <div class="message-list">
 
-?>
+            <?php while($message = $messages->fetch()): ?>
 
-<a href="dashboard.php">
-Back to Dashboard
-</a>
+                <?php
+
+                $otherUserId =
+                    $message['sender_id'] == $_SESSION['user_id']
+                    ? $message['receiver_id']
+                    : $message['sender_id'];
+
+                $otherUserName =
+                    $message['sender_id'] == $_SESSION['user_id']
+                    ? $message['receiver_name']
+                    : $message['sender_name'];
+
+                ?>
+
+                <div class="message-preview-card">
+
+                    <div class="message-preview-top">
+
+                        <div>
+
+                            <span class="message-product-label">
+                                Product
+                            </span>
+
+                            <h3>
+                                <?= htmlspecialchars($message['product_title']); ?>
+                            </h3>
+
+                        </div>
+
+                        <span class="message-date">
+                            <?= htmlspecialchars($message['created_at']); ?>
+                        </span>
+
+                    </div>
+
+
+                    <div class="message-sender">
+
+                        <strong>
+                            Conversation with:
+                        </strong>
+
+                        <?= htmlspecialchars($otherUserName); ?>
+
+                    </div>
+
+
+                    <p class="message-preview-text">
+                        <?= htmlspecialchars($message['message']); ?>
+                    </p>
+
+
+                    <a
+                        href="buyer-conversation.php?product_id=<?= (int)$message['product_id']; ?>&user_id=<?= (int)$otherUserId; ?>"
+                        class="message-open-btn">
+
+                        View Conversation
+
+                    </a>
+
+                </div>
+
+            <?php endwhile; ?>
+
+        </div>
+
+    <?php endif; ?>
 
 </div>
 

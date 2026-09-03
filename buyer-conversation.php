@@ -1,7 +1,10 @@
 <?php
 
 include 'includes/auth.php';
+include 'includes/role-auth.php';
 include 'config/database.php';
+
+requireRole('buyer');
 
 if(
     !isset($_GET['product_id']) ||
@@ -14,140 +17,314 @@ if(
     exit();
 }
 
-$product_id = $_GET['product_id'];
-$other_user_id = $_GET['user_id'];
-$current_user_id = $_SESSION['user_id'];
+$productId = (int)$_GET['product_id'];
+$sellerId = (int)$_GET['user_id'];
+$buyerId = (int)$_SESSION['user_id'];
+
+$error = "";
+$success = "";
+
 
 /*
- * Get the conversation between the logged-in buyer
- * and the other user for this product.
+ * Verify seller and product.
  */
-$stmt = $pdo->prepare(
+$productStmt = $pdo->prepare(
+    "SELECT products.id,
+            products.title AS product_title,
+            users.fullname AS seller_name
+
+     FROM products
+
+     INNER JOIN users
+        ON products.user_id = users.id
+
+     WHERE products.id = ?
+     AND products.user_id = ?
+     AND users.role = 'seller'"
+);
+
+$productStmt->execute([
+    $productId,
+    $sellerId
+]);
+
+$product = $productStmt->fetch();
+
+if(!$product)
+{
+    header("Location: buyer-messages.php");
+    exit();
+}
+
+
+/*
+ * Verify conversation exists.
+ */
+$conversationStmt = $pdo->prepare(
+    "SELECT id
+     FROM messages
+
+     WHERE product_id = ?
+
+     AND (
+        (sender_id = ? AND receiver_id = ?)
+        OR
+        (sender_id = ? AND receiver_id = ?)
+     )
+
+     LIMIT 1"
+);
+
+$conversationStmt->execute([
+    $productId,
+    $buyerId,
+    $sellerId,
+    $sellerId,
+    $buyerId
+]);
+
+if(!$conversationStmt->fetch())
+{
+    header("Location: buyer-messages.php");
+    exit();
+}
+
+
+/*
+ * Buyer reply.
+ */
+if(isset($_POST['send_reply']))
+{
+    $reply = trim($_POST['reply'] ?? '');
+
+    if($reply === '')
+    {
+        $error = "Please enter a reply.";
+    }
+    elseif(strlen($reply) > 5000)
+    {
+        $error = "Your message is too long.";
+    }
+    else
+    {
+        $replyStmt = $pdo->prepare(
+            "INSERT INTO messages
+            (
+                sender_id,
+                receiver_id,
+                product_id,
+                message
+            )
+            VALUES (?, ?, ?, ?)"
+        );
+
+        $replyStmt->execute([
+            $buyerId,
+            $sellerId,
+            $productId,
+            $reply
+        ]);
+
+        $success = "Reply sent successfully.";
+    }
+}
+
+
+/*
+ * Load conversation.
+ */
+$messagesStmt = $pdo->prepare(
     "SELECT messages.*,
             sender.fullname AS sender_name,
-            receiver.fullname AS receiver_name,
-            products.title AS product_title
+            receiver.fullname AS receiver_name
+
      FROM messages
+
      INNER JOIN users AS sender
         ON messages.sender_id = sender.id
+
      INNER JOIN users AS receiver
         ON messages.receiver_id = receiver.id
-     INNER JOIN products
-        ON messages.product_id = products.id
+
      WHERE messages.product_id = ?
+
      AND (
-         (messages.sender_id = ? AND messages.receiver_id = ?)
-         OR
-         (messages.sender_id = ? AND messages.receiver_id = ?)
+        (messages.sender_id = ? AND messages.receiver_id = ?)
+        OR
+        (messages.sender_id = ? AND messages.receiver_id = ?)
      )
+
      ORDER BY messages.created_at ASC"
 );
 
-$stmt->execute([
-    $product_id,
-    $current_user_id,
-    $other_user_id,
-    $other_user_id,
-    $current_user_id
+$messagesStmt->execute([
+    $productId,
+    $buyerId,
+    $sellerId,
+    $sellerId,
+    $buyerId
 ]);
 
-$messages = $stmt;
+$messages = $messagesStmt;
+
+
+/*
+ * Review only after completed order.
+ */
+$orderStmt = $pdo->prepare(
+    "SELECT id
+     FROM orders
+     WHERE buyer_id = ?
+     AND seller_id = ?
+     AND product_id = ?
+     AND status = 'completed'
+     LIMIT 1"
+);
+
+$orderStmt->execute([
+    $buyerId,
+    $sellerId,
+    $productId
+]);
+
+$completedOrder = $orderStmt->fetch();
+
 
 include 'includes/header.php';
 
 ?>
 
-<div class="form-container">
+<div class="conversation-page">
 
-<h2>
-Conversation
-</h2>
+    <div class="page-header">
 
-<?php
+        <div>
 
-$firstMessage = $messages->fetch();
+            <h1>
+                Conversation
+            </h1>
 
-if(!$firstMessage)
-{
-?>
+            <p>
+                <strong>Product:</strong>
+                <?= htmlspecialchars($product['product_title']); ?>
+            </p>
 
-<p>
-Conversation not found.
-</p>
+            <p>
+                <strong>Seller:</strong>
+                <?= htmlspecialchars($product['seller_name']); ?>
+            </p>
 
-<a href="buyer-messages.php">
-Back to Messages
-</a>
+        </div>
 
-<?php
-}
-else
-{
-?>
+        <a href="buyer-messages.php" class="secondary-btn">
+            Back to Messages
+        </a>
 
-<h3>
-<?= htmlspecialchars($firstMessage['product_title']); ?>
-</h3>
+    </div>
 
-<p>
-Conversation with:
-<?= htmlspecialchars(
-    $firstMessage['sender_id'] == $current_user_id
-    ? $firstMessage['receiver_name']
-    : $firstMessage['sender_name']
-); ?>
-</p>
 
-<hr>
+    <?php if($error): ?>
 
-<?php
+        <div class="status-message error">
+            <?= htmlspecialchars($error); ?>
+        </div>
 
-do
-{
-?>
+    <?php endif; ?>
 
-<div class="card">
 
-<p>
-<strong>
-<?= htmlspecialchars($firstMessage['sender_name']); ?>:
-</strong>
-</p>
+    <?php if($success): ?>
 
-<p>
-<?= htmlspecialchars($firstMessage['message']); ?>
-</p>
+        <div class="status-message success">
+            <?= htmlspecialchars($success); ?>
+        </div>
 
-<p>
-<?= htmlspecialchars($firstMessage['created_at']); ?>
-</p>
+    <?php endif; ?>
 
-</div>
 
-<br>
+    <div class="conversation-box">
 
-<?php
+        <?php while($message = $messages->fetch()): ?>
 
-}
-while($firstMessage = $messages->fetch());
+            <div class="message-row
+                <?= $message['sender_id'] == $buyerId
+                    ? 'message-own'
+                    : 'message-other'; ?>">
 
-?>
+                <div class="message-bubble">
 
-<?php
-}
-?>
+                    <strong>
+                        <?= htmlspecialchars($message['sender_name']); ?>
+                    </strong>
 
-<br>
+                    <p>
+                        <?= nl2br(
+                            htmlspecialchars($message['message'])
+                        ); ?>
+                    </p>
 
-<a href="review-seller.php?product_id=<?= (int)$product_id; ?>&seller_id=<?= (int)$other_user_id; ?>">
-Leave a Review
-</a>
+                    <small>
+                        <?= htmlspecialchars($message['created_at']); ?>
+                    </small>
 
-<br><br>
+                </div>
 
-<a href="buyer-messages.php">
-Back to Messages
-</a>
+            </div>
+
+        <?php endwhile; ?>
+
+    </div>
+
+
+    <div class="conversation-reply">
+
+        <h2>
+            Reply
+        </h2>
+
+        <form method="POST">
+
+            <textarea
+                name="reply"
+                rows="5"
+                maxlength="5000"
+                placeholder="Write your reply..."
+                required></textarea>
+
+            <button
+                type="submit"
+                name="send_reply">
+
+                Send Reply
+
+            </button>
+
+        </form>
+
+    </div>
+
+
+    <div class="conversation-review-action">
+
+        <?php if($completedOrder): ?>
+
+            <a
+                href="review-seller.php?product_id=<?= $productId; ?>&seller_id=<?= $sellerId; ?>"
+                class="home-secondary-btn">
+
+                Leave a Review
+
+            </a>
+
+        <?php else: ?>
+
+            <p>
+                You can review this seller after your order
+                for this product has been completed.
+            </p>
+
+        <?php endif; ?>
+
+    </div>
 
 </div>
 

@@ -39,3 +39,5 @@ node_modules/
 # Build/output directories
 dist/
 build/
+# Track the canonical SafeTrade database schema
+!database/schema.sql

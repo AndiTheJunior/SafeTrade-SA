@@ -1,6 +1,10 @@
 <?php
 
-include 'includes/auth.php';
+if(session_status() === PHP_SESSION_NONE)
+{
+    session_start();
+}
+
 include 'config/database.php';
 
 if(!isset($_GET['id']) || !is_numeric($_GET['id']))
@@ -9,10 +13,11 @@ if(!isset($_GET['id']) || !is_numeric($_GET['id']))
     exit();
 }
 
-$id = $_GET['id'];
+$productId = (int)$_GET['id'];
+
 
 /*
- * Get the active product and seller information.
+ * Get product and seller information.
  */
 $stmt = $pdo->prepare(
     "SELECT products.*,
@@ -21,12 +26,11 @@ $stmt = $pdo->prepare(
      FROM products
      INNER JOIN users
         ON products.user_id = users.id
-     WHERE products.id = ?
-     AND products.status = 'active'"
+     WHERE products.id = ?"
 );
 
 $stmt->execute([
-    $id
+    $productId
 ]);
 
 $product = $stmt->fetch();
@@ -37,26 +41,62 @@ if(!$product)
     exit();
 }
 
+
+$isLoggedIn =
+    isset($_SESSION['user_id']);
+
+$isSeller =
+    $isLoggedIn &&
+    $_SESSION['user_id'] == $product['user_id'];
+
+$isAdmin =
+    $isLoggedIn &&
+    isset($_SESSION['role']) &&
+    $_SESSION['role'] === 'admin';
+
+
 /*
- * Prevent the seller from messaging themselves.
+ * Sold products are hidden from normal marketplace users.
+ * The owner and admin may still view them.
  */
-$isSeller = ($_SESSION['user_id'] == $product['user_id']);
+if(
+    $product['status'] !== 'active' &&
+    !$isSeller &&
+    !$isAdmin
+)
+{
+    header("Location: products.php");
+    exit();
+}
+
 
 $error = "";
 $success = "";
 
+
 /*
- * Process a buyer order.
+ * Place an order.
  */
 if(isset($_POST['place_order']))
 {
-    if($_SESSION['role'] !== 'buyer')
+    if(!$isLoggedIn)
+    {
+        $error = "Please log in before placing an order.";
+    }
+    elseif(
+        !isset($_SESSION['role']) ||
+        $_SESSION['role'] !== 'buyer'
+    )
     {
         $error = "Only buyers can place orders.";
     }
     elseif($isSeller)
     {
         $error = "You cannot order your own product.";
+    }
+    elseif($product['status'] !== 'active')
+    {
+        $error = "This product is no longer available.";
     }
     else
     {
@@ -65,7 +105,7 @@ if(isset($_POST['place_order']))
             $pdo->beginTransaction();
 
             /*
-             * Lock the product row while checking its availability.
+             * Lock product while confirming availability.
              */
             $orderProductStmt = $pdo->prepare(
                 "SELECT id, user_id, price, status
@@ -78,20 +118,27 @@ if(isset($_POST['place_order']))
                 $product['id']
             ]);
 
-            $orderProduct = $orderProductStmt->fetch();
+            $orderProduct =
+                $orderProductStmt->fetch();
 
             if(!$orderProduct)
             {
-                throw new Exception("Product not found.");
+                throw new Exception(
+                    "Product not found."
+                );
             }
 
             if($orderProduct['status'] !== 'active')
             {
-                throw new Exception("This product is no longer available.");
+                throw new Exception(
+                    "This product is no longer available."
+                );
             }
 
+
             /*
-             * Make sure there is no existing active order.
+             * Prevent another active order
+             * for the same product.
              */
             $existingOrderStmt = $pdo->prepare(
                 "SELECT id
@@ -107,15 +154,24 @@ if(isset($_POST['place_order']))
 
             if($existingOrderStmt->fetch())
             {
-                throw new Exception("This product already has an active order.");
+                throw new Exception(
+                    "This product already has an active order."
+                );
             }
 
+
             /*
-             * Create the order using the current product price.
+             * Create order using current price.
              */
             $orderStmt = $pdo->prepare(
                 "INSERT INTO orders
-                (buyer_id, seller_id, product_id, amount, status)
+                (
+                    buyer_id,
+                    seller_id,
+                    product_id,
+                    amount,
+                    status
+                )
                 VALUES (?, ?, ?, ?, 'pending')"
             );
 
@@ -126,9 +182,9 @@ if(isset($_POST['place_order']))
                 $orderProduct['price']
             ]);
 
+
             /*
-             * Mark the product as sold so another buyer
-             * cannot place an order for it.
+             * Reserve product.
              */
             $updateProductStmt = $pdo->prepare(
                 "UPDATE products
@@ -143,7 +199,9 @@ if(isset($_POST['place_order']))
 
             if($updateProductStmt->rowCount() !== 1)
             {
-                throw new Exception("The product is no longer available.");
+                throw new Exception(
+                    "The product is no longer available."
+                );
             }
 
             $pdo->commit();
@@ -163,96 +221,67 @@ if(isset($_POST['place_order']))
     }
 }
 
+
 /*
- * Process the message form.
+ * Send message to seller.
  */
 if(isset($_POST['send_message']))
 {
-    $message = trim($_POST['message']);
+    $message =
+        trim($_POST['message'] ?? '');
 
-    if($message == '')
+    if(!$isLoggedIn)
     {
-        $error = "Please enter a message.";
+        $error =
+            "Please log in before contacting the seller.";
+    }
+    elseif(
+        !isset($_SESSION['role']) ||
+        $_SESSION['role'] !== 'buyer'
+    )
+    {
+        $error =
+            "Only buyers can contact sellers from a product listing.";
     }
     elseif($isSeller)
     {
-        $error = "You cannot message yourself.";
+        $error =
+            "You cannot message yourself.";
+    }
+    elseif($message === '')
+    {
+        $error =
+            "Please enter a message.";
     }
     else
     {
-        $stmt = $pdo->prepare(
+        $messageStmt = $pdo->prepare(
             "INSERT INTO messages
-            (sender_id, receiver_id, product_id, message)
+            (
+                sender_id,
+                receiver_id,
+                product_id,
+                message
+            )
             VALUES (?, ?, ?, ?)"
         );
 
-        $stmt->execute([
+        $messageStmt->execute([
             $_SESSION['user_id'],
             $product['user_id'],
             $product['id'],
             $message
         ]);
 
-        $success = "Message sent successfully.";
+        $success =
+            "Message sent successfully.";
     }
 }
 
-include 'includes/header.php';
 
-?>
-
-<div class="form-container">
-
-<?php if(!empty($product['image'])): ?>
-
-<img
-src="uploads/products/<?= htmlspecialchars($product['image']); ?>"
-style="width:100%;"
->
-
-<?php endif; ?>
-
-<h2>
-<?= htmlspecialchars($product['title']); ?>
-</h2>
-
-<p>
-<?= htmlspecialchars($product['description']); ?>
-</p>
-
-<p>
-Price:
-R<?= htmlspecialchars($product['price']); ?>
-</p>
-
-<p>
-Category:
-<?= htmlspecialchars($product['category']); ?>
-</p>
-
-<p>
-Location:
-<?= htmlspecialchars($product['location']); ?>
-</p>
-
-<p>
-Seller:
-<?= htmlspecialchars($product['seller_name']); ?>
-
-<?php if($product['seller_verification_status'] === 'verified'): ?>
-
-✓ Verified
-
-<?php else: ?>
-
-— Unverified
-
-<?php endif; ?>
-
-</p>
-
-<?php
-
+/*
+ * Seller rating summary.
+ */
 $reviewStmt = $pdo->prepare(
     "SELECT
         AVG(rating) AS average_rating,
@@ -265,64 +294,13 @@ $reviewStmt->execute([
     $product['user_id']
 ]);
 
-$reviewSummary = $reviewStmt->fetch();
+$reviewSummary =
+    $reviewStmt->fetch();
 
-?>
 
-<p>
-
-Rating:
-
-<?php
-
-if($reviewSummary['review_count'] > 0)
-{
-    $averageRating = round($reviewSummary['average_rating']);
-
-for($i = 1; $i <= 5; $i++)
-{
-    if($i <= $averageRating)
-    {
-        echo "⭐";
-    }
-    else
-    {
-        echo "☆";
-    }
-}
-
-echo " ";
-echo number_format($reviewSummary['average_rating'], 1);
-echo "/5 ";
-
-echo "(" . $reviewSummary['review_count'];
-
-if($reviewSummary['review_count'] == 1)
-{
-    echo " review)";
-}
-else
-{
-    echo " reviews)";
-}
-}
-else
-{
-    echo "No reviews yet";
-}
-
-?>
-
-</p>
-
-<hr>
-
-<h3>
-Reviews
-</h3>
-
-<?php
-
+/*
+ * Reviews for this product.
+ */
 $reviewsStmt = $pdo->prepare(
     "SELECT reviews.*,
             users.fullname AS reviewer_name
@@ -339,152 +317,423 @@ $reviewsStmt->execute([
 
 $reviews = $reviewsStmt;
 
-if($reviews->rowCount() == 0)
-{
-?>
 
-<p>
-No reviews yet.
-</p>
-
-<?php
-}
-
-while($review = $reviews->fetch())
-{
-?>
-
-<div class="card">
-
-<p>
-<strong>
-<?= htmlspecialchars($review['reviewer_name']); ?>
-</strong>
-</p>
-
-<p>
-
-<?php
-
-for($i = 1; $i <= 5; $i++)
-{
-    if($i <= $review['rating'])
-    {
-        echo "⭐";
-    }
-    else
-    {
-        echo "☆";
-    }
-}
+include 'includes/header.php';
 
 ?>
 
-</p>
-<p>
-<?= htmlspecialchars($review['review']); ?>
-</p>
+<div class="product-details-page">
 
-<p>
-Reviewed:
-<?= htmlspecialchars($review['created_at']); ?>
-</p>
+    <div class="product-details-top">
 
-</div>
+        <a href="products.php" class="secondary-btn">
+            Back to Marketplace
+        </a>
 
-<br>
+        <?php if($isSeller): ?>
 
-<?php
-}
+            <a
+                href="edit-product.php?id=<?= (int)$product['id']; ?>"
+                class="secondary-btn">
 
-?>
+                Edit Product
 
-<p>
-Status:
-<?= htmlspecialchars($product['status']); ?>
-</p>
+            </a>
 
-<hr>
+        <?php endif; ?>
 
-<?php if($error): ?>
+    </div>
 
-<p>
-<?= htmlspecialchars($error); ?>
-</p>
 
-<?php endif; ?>
+    <?php if($error): ?>
 
-<?php if($success): ?>
+        <div class="status-message error">
+            <?= htmlspecialchars($error); ?>
+        </div>
 
-<p>
-<?= htmlspecialchars($success); ?>
-</p>
+    <?php endif; ?>
 
-<?php endif; ?>
 
-<?php if(!$isSeller): ?>
+    <?php if($success): ?>
 
-<?php if($_SESSION['role'] === 'buyer'): ?>
+        <div class="status-message success">
+            <?= htmlspecialchars($success); ?>
+        </div>
 
-<hr>
+    <?php endif; ?>
 
-<h3>
-Buy This Product
-</h3>
 
-<p>
-By placing an order, this product will be reserved for you.
-</p>
+    <div class="product-detail-layout">
 
-<form method="POST">
+        <div class="product-detail-image">
 
-<button
-type="submit"
-name="place_order"
-onclick="return confirm('Are you sure you want to place this order?');">
-Place Order
-</button>
+            <?php if(!empty($product['image'])): ?>
 
-</form>
+                <img
+                    src="uploads/products/<?= htmlspecialchars($product['image']); ?>"
+                    alt="<?= htmlspecialchars($product['title']); ?>"
+                >
 
-<?php endif; ?>
+            <?php else: ?>
 
-<h3>
-Contact Seller
-</h3>
+                <div class="product-no-image">
+                    No product image
+                </div>
 
-<form method="POST">
+            <?php endif; ?>
 
-<textarea
-name="message"
-placeholder="Write a message to the seller..."
-rows="5"
-style="width:100%;padding:10px;"
-required></textarea>
+        </div>
 
-<br><br>
 
-<button
-type="submit"
-name="send_message">
-Send Message
-</button>
+        <div class="product-detail-content">
 
-</form>
+            <div class="product-detail-heading">
 
-<?php else: ?>
+                <div>
 
-<p>
-This is your product.
-</p>
+                    <span class="product-category-label">
+                        <?= htmlspecialchars($product['category']); ?>
+                    </span>
 
-<?php endif; ?>
+                    <h1>
+                        <?= htmlspecialchars($product['title']); ?>
+                    </h1>
 
-<br>
+                </div>
 
-<a href="products.php">
-Back to Marketplace
-</a>
+
+                <span class="product-status product-status-<?= htmlspecialchars($product['status']); ?>">
+
+                    <?= htmlspecialchars(
+                        ucfirst($product['status'])
+                    ); ?>
+
+                </span>
+
+            </div>
+
+
+            <div class="product-detail-price">
+
+                R<?= number_format(
+                    (float)$product['price'],
+                    2
+                ); ?>
+
+            </div>
+
+
+            <p class="product-description">
+                <?= nl2br(
+                    htmlspecialchars(
+                        $product['description']
+                    )
+                ); ?>
+            </p>
+
+
+            <div class="product-info-grid">
+
+                <div>
+
+                    <span>
+                        Location
+                    </span>
+
+                    <strong>
+                        <?= htmlspecialchars($product['location']); ?>
+                    </strong>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        Seller
+                    </span>
+
+                    <strong>
+                        <?= htmlspecialchars($product['seller_name']); ?>
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            <div class="seller-trust-row">
+
+                <?php if(
+                    $product['seller_verification_status']
+                    === 'verified'
+                ): ?>
+
+                    <span class="seller-verified-badge">
+                        &#10003; Verified Seller
+                    </span>
+
+                <?php else: ?>
+
+                    <span class="seller-unverified-badge">
+                        Unverified Seller
+                    </span>
+
+                <?php endif; ?>
+
+
+                <span class="seller-rating">
+
+                    <?php
+
+                    if($reviewSummary['review_count'] > 0)
+                    {
+                        $averageRating =
+                            round(
+                                $reviewSummary['average_rating']
+                            );
+
+                        for($i = 1; $i <= 5; $i++)
+                        {
+                            if($i <= $averageRating)
+                            {
+                                echo "&#9733;";
+                            }
+                            else
+                            {
+                                echo "&#9734;";
+                            }
+                        }
+
+                        echo " " .
+                            number_format(
+                                (float)$reviewSummary['average_rating'],
+                                1
+                            ) .
+                            "/5";
+
+                        echo " (" .
+                            (int)$reviewSummary['review_count'];
+
+                        echo
+                            $reviewSummary['review_count'] == 1
+                            ? " review)"
+                            : " reviews)";
+                    }
+                    else
+                    {
+                        echo "No reviews yet";
+                    }
+
+                    ?>
+
+                </span>
+
+            </div>
+
+
+            <?php if($isSeller): ?>
+
+                <div class="product-owner-notice">
+
+                    <strong>
+                        This is your product listing.
+                    </strong>
+
+                    <p>
+                        Manage it from your seller product dashboard.
+                    </p>
+
+                </div>
+
+
+            <?php elseif(
+                $isLoggedIn &&
+                isset($_SESSION['role']) &&
+                $_SESSION['role'] === 'buyer' &&
+                $product['status'] === 'active'
+            ): ?>
+
+                <div class="product-buyer-actions">
+
+                    <div class="product-order-box">
+
+                        <h3>
+                            Buy This Product
+                        </h3>
+
+                        <p>
+                            Placing an order reserves this product
+                            while the seller reviews your request.
+                        </p>
+
+                        <form method="POST">
+
+                            <button
+                                type="submit"
+                                name="place_order"
+                                class="product-order-btn"
+                                onclick="return confirm('Are you sure you want to place this order?');">
+
+                                Place Order
+
+                            </button>
+
+                        </form>
+
+                    </div>
+
+
+                    <div class="product-contact-box">
+
+                        <h3>
+                            Contact Seller
+                        </h3>
+
+                        <form method="POST">
+
+                            <textarea
+                                name="message"
+                                rows="5"
+                                placeholder="Write a message to the seller..."
+                                required></textarea>
+
+                            <button
+                                type="submit"
+                                name="send_message">
+
+                                Send Message
+
+                            </button>
+
+                        </form>
+
+                    </div>
+
+                </div>
+
+
+            <?php elseif(!$isLoggedIn): ?>
+
+                <div class="product-login-notice">
+
+                    <h3>
+                        Interested in this product?
+                    </h3>
+
+                    <p>
+                        Log in as a buyer to contact the seller
+                        or place an order.
+                    </p>
+
+                    <a href="login.php" class="home-primary-btn">
+                        Login
+                    </a>
+
+                    <a href="register.php" class="home-secondary-btn">
+                        Create Account
+                    </a>
+
+                </div>
+
+            <?php endif; ?>
+
+        </div>
+
+    </div>
+
+
+    <!-- REVIEWS -->
+
+    <section class="product-reviews-section">
+
+        <div class="product-reviews-heading">
+
+            <h2>
+                Reviews
+            </h2>
+
+            <p>
+                Feedback from SafeTrade buyers.
+            </p>
+
+        </div>
+
+
+        <?php if($reviews->rowCount() == 0): ?>
+
+            <div class="empty-state">
+
+                <h3>
+                    No Reviews Yet
+                </h3>
+
+                <p>
+                    This product has not received any reviews yet.
+                </p>
+
+            </div>
+
+        <?php else: ?>
+
+            <div class="product-review-grid">
+
+                <?php while($review = $reviews->fetch()): ?>
+
+                    <div class="product-review-card">
+
+                        <div class="review-card-heading">
+
+                            <strong>
+                                <?= htmlspecialchars(
+                                    $review['reviewer_name']
+                                ); ?>
+                            </strong>
+
+                            <span class="review-stars">
+
+                                <?php
+
+                                for($i = 1; $i <= 5; $i++)
+                                {
+                                    echo
+                                        $i <= $review['rating']
+                                        ? "&#9733;"
+                                        : "&#9734;";
+                                }
+
+                                ?>
+
+                            </span>
+
+                        </div>
+
+
+                        <p>
+                            <?= nl2br(
+                                htmlspecialchars(
+                                    $review['review']
+                                )
+                            ); ?>
+                        </p>
+
+
+                        <small>
+                            Reviewed:
+                            <?= htmlspecialchars(
+                                $review['created_at']
+                            ); ?>
+                        </small>
+
+                    </div>
+
+                <?php endwhile; ?>
+
+            </div>
+
+        <?php endif; ?>
+
+    </section>
 
 </div>
 

@@ -17,238 +17,251 @@ if(
     exit();
 }
 
-$product_id = $_GET['product_id'];
-$buyer_id = $_GET['user_id'];
+$productId = (int)$_GET['product_id'];
+$buyerId = (int)$_GET['user_id'];
+$sellerId = (int)$_SESSION['user_id'];
 
 $error = "";
 $success = "";
 
+
 /*
- * Send seller reply.
+ * Verify that this product belongs to the
+ * currently logged-in seller.
+ */
+$productStmt = $pdo->prepare(
+    "SELECT products.id,
+            products.title AS product_title,
+            users.fullname AS buyer_name
+
+     FROM products
+
+     INNER JOIN messages
+        ON messages.product_id = products.id
+
+     INNER JOIN users
+        ON users.id = ?
+
+     WHERE products.id = ?
+     AND products.user_id = ?
+     AND users.role = 'buyer'
+
+     AND (
+        (messages.sender_id = ? AND messages.receiver_id = ?)
+        OR
+        (messages.sender_id = ? AND messages.receiver_id = ?)
+     )
+
+     LIMIT 1"
+);
+
+$productStmt->execute([
+    $buyerId,
+    $productId,
+    $sellerId,
+    $buyerId,
+    $sellerId,
+    $sellerId,
+    $buyerId
+]);
+
+$product = $productStmt->fetch();
+
+if(!$product)
+{
+    header("Location: messages.php");
+    exit();
+}
+
+
+/*
+ * Process seller reply.
  */
 if(isset($_POST['send_reply']))
 {
-    $reply = trim($_POST['reply']);
+    $reply = trim($_POST['reply'] ?? '');
 
-    if($reply == '')
+    if($reply === '')
     {
         $error = "Please enter a reply.";
     }
+    elseif(strlen($reply) > 5000)
+    {
+        $error = "Your message is too long.";
+    }
     else
     {
-        /*
-         * Verify that the buyer actually has
-         * a conversation with this seller
-         * for this product.
-         */
-        $stmt = $pdo->prepare(
-            "SELECT id
-             FROM messages
-             WHERE product_id = ?
-             AND sender_id = ?
-             AND receiver_id = ?
-             LIMIT 1"
+        $replyStmt = $pdo->prepare(
+            "INSERT INTO messages
+            (
+                sender_id,
+                receiver_id,
+                product_id,
+                message
+            )
+            VALUES (?, ?, ?, ?)"
         );
 
-        $stmt->execute([
-            $product_id,
-            $buyer_id,
-            $_SESSION['user_id']
+        $replyStmt->execute([
+            $sellerId,
+            $buyerId,
+            $productId,
+            $reply
         ]);
 
-        $existingMessage = $stmt->fetch();
-
-        if(!$existingMessage)
-        {
-            $error = "Conversation not found.";
-        }
-        else
-        {
-            /*
-             * Save the seller's reply.
-             */
-            $stmt = $pdo->prepare(
-                "INSERT INTO messages
-                (sender_id, receiver_id, product_id, message)
-                VALUES (?, ?, ?, ?)"
-            );
-
-            $stmt->execute([
-                $_SESSION['user_id'],
-                $buyer_id,
-                $product_id,
-                $reply
-            ]);
-
-            $success = "Reply sent successfully.";
-        }
+        $success = "Reply sent successfully.";
     }
 }
 
+
 /*
- * Get the conversation.
+ * Get complete conversation.
  */
-$stmt = $pdo->prepare(
+$messagesStmt = $pdo->prepare(
     "SELECT messages.*,
             sender.fullname AS sender_name,
-            receiver.fullname AS receiver_name,
-            products.title AS product_title
+            receiver.fullname AS receiver_name
+
      FROM messages
+
      INNER JOIN users AS sender
         ON messages.sender_id = sender.id
+
      INNER JOIN users AS receiver
         ON messages.receiver_id = receiver.id
-     INNER JOIN products
-        ON messages.product_id = products.id
+
      WHERE messages.product_id = ?
+
      AND (
-         (messages.sender_id = ? AND messages.receiver_id = ?)
-         OR
-         (messages.sender_id = ? AND messages.receiver_id = ?)
+        (messages.sender_id = ? AND messages.receiver_id = ?)
+        OR
+        (messages.sender_id = ? AND messages.receiver_id = ?)
      )
+
      ORDER BY messages.created_at ASC"
 );
 
-$stmt->execute([
-    $product_id,
-    $buyer_id,
-    $_SESSION['user_id'],
-    $_SESSION['user_id'],
-    $buyer_id
+$messagesStmt->execute([
+    $productId,
+    $buyerId,
+    $sellerId,
+    $sellerId,
+    $buyerId
 ]);
 
-$messages = $stmt;
+$messages = $messagesStmt;
 
 include 'includes/header.php';
 
 ?>
 
-<div class="form-container">
+<div class="conversation-page">
 
-<h2>
-Conversation
-</h2>
+    <div class="page-header">
 
-<?php if($error): ?>
+        <div>
 
-<p>
-<?= htmlspecialchars($error); ?>
-</p>
+            <h1>
+                Conversation
+            </h1>
 
-<?php endif; ?>
+            <p>
+                <strong>Product:</strong>
+                <?= htmlspecialchars($product['product_title']); ?>
+            </p>
 
-<?php if($success): ?>
+            <p>
+                <strong>Buyer:</strong>
+                <?= htmlspecialchars($product['buyer_name']); ?>
+            </p>
 
-<p>
-<?= htmlspecialchars($success); ?>
-</p>
+        </div>
 
-<?php endif; ?>
+        <a href="messages.php" class="secondary-btn">
+            Back to Messages
+        </a>
 
-<?php
+    </div>
 
-$firstMessage = $messages->fetch();
 
-if(!$firstMessage)
-{
-?>
+    <?php if($error): ?>
 
-<p>
-Conversation not found.
-</p>
+        <div class="status-message error">
+            <?= htmlspecialchars($error); ?>
+        </div>
 
-<a href="messages.php">
-Back to Messages
-</a>
+    <?php endif; ?>
 
-<?php
-}
-else
-{
-?>
 
-<h3>
-<?= htmlspecialchars($firstMessage['product_title']); ?>
-</h3>
+    <?php if($success): ?>
 
-<p>
-Conversation with:
-<?= htmlspecialchars(
-    $firstMessage['sender_id'] == $_SESSION['user_id']
-    ? $firstMessage['receiver_name']
-    : $firstMessage['sender_name']
-); ?>
-</p>
+        <div class="status-message success">
+            <?= htmlspecialchars($success); ?>
+        </div>
 
-<hr>
+    <?php endif; ?>
 
-<?php
 
-do
-{
-?>
+    <div class="conversation-box">
 
-<div class="card">
+        <?php while($message = $messages->fetch()): ?>
 
-<p>
-<strong>
-<?= htmlspecialchars($firstMessage['sender_name']); ?>:
-</strong>
-</p>
+            <div class="message-row
+                <?= $message['sender_id'] == $sellerId
+                    ? 'message-own'
+                    : 'message-other'; ?>">
 
-<p>
-<?= htmlspecialchars($firstMessage['message']); ?>
-</p>
+                <div class="message-bubble">
 
-<p>
-<?= htmlspecialchars($firstMessage['created_at']); ?>
-</p>
+                    <strong>
+                        <?= htmlspecialchars($message['sender_name']); ?>
+                    </strong>
 
-</div>
+                    <p>
+                        <?= nl2br(
+                            htmlspecialchars($message['message'])
+                        ); ?>
+                    </p>
 
-<br>
+                    <small>
+                        <?= htmlspecialchars($message['created_at']); ?>
+                    </small>
 
-<?php
+                </div>
 
-}
-while($firstMessage = $messages->fetch());
+            </div>
 
-?>
+        <?php endwhile; ?>
 
-<hr>
+    </div>
 
-<h3>
-Reply
-</h3>
 
-<form method="POST">
+    <div class="conversation-reply">
 
-<textarea
-name="reply"
-placeholder="Write your reply..."
-rows="5"
-style="width:100%;padding:10px;"
-required></textarea>
+        <h2>
+            Reply
+        </h2>
 
-<br><br>
+        <form method="POST">
 
-<button
-type="submit"
-name="send_reply">
-Send Reply
-</button>
+            <textarea
+                name="reply"
+                rows="5"
+                maxlength="5000"
+                placeholder="Write your reply..."
+                required></textarea>
 
-</form>
+            <button
+                type="submit"
+                name="send_reply">
 
-<?php
-}
-?>
+                Send Reply
 
-<br>
+            </button>
 
-<a href="messages.php">
-Back to Messages
-</a>
+        </form>
+
+    </div>
 
 </div>
 
