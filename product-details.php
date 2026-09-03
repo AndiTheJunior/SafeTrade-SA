@@ -15,7 +15,9 @@ $id = $_GET['id'];
  * Get the active product and seller information.
  */
 $stmt = $pdo->prepare(
-    "SELECT products.*, users.fullname AS seller_name
+    "SELECT products.*,
+            users.fullname AS seller_name,
+            users.verification_status AS seller_verification_status
      FROM products
      INNER JOIN users
         ON products.user_id = users.id
@@ -118,6 +120,17 @@ Location:
 <p>
 Seller:
 <?= htmlspecialchars($product['seller_name']); ?>
+
+<?php if($product['seller_verification_status'] === 'verified'): ?>
+
+✓ Verified
+
+<?php else: ?>
+
+— Unverified
+
+<?php endif; ?>
+
 </p>
 
 <?php
@@ -172,7 +185,7 @@ if($reviewSummary['review_count'] == 1)
 }
 else
 {
-    echo " review)";
+    echo " reviews)";
 }
 }
 else
