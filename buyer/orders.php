@@ -88,6 +88,34 @@ Status:
 </strong>
 </p>
 
+<?php if($order['status'] === 'accepted'): ?>
+
+<a href="checkout.php?order_id=<?= (int)$order['id']; ?>">
+Proceed to Payment
+</a>
+
+<br><br>
+
+<?php elseif($order['status'] === 'pending'): ?>
+
+<p>
+Waiting for the seller to accept this order before payment.
+</p>
+
+<?php elseif($order['status'] === 'completed'): ?>
+
+<p>
+This order has been completed.
+</p>
+
+<?php elseif($order['status'] === 'cancelled'): ?>
+
+<p>
+This order has been cancelled.
+</p>
+
+<?php endif; ?>
+
 <p>
 Order Date:
 <?= htmlspecialchars($order['created_at']); ?>
