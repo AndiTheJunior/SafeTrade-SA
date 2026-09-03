@@ -1,8 +1,12 @@
 <footer>
-    <p>SafeTrade SA © 2026</p>
+
+    <p>
+        SafeTrade SA &copy; <?= date('Y'); ?>
+    </p>
+
 </footer>
 
-<script src="assets/js/app.js"></script>
+<script src="<?= $baseUrl; ?>assets/js/app.js"></script>
 
 </body>
 </html>

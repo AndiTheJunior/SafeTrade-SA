@@ -16,16 +16,12 @@ if(isset($_GET['search']))
     $search = trim($_GET['search']);
 }
 
-/*
- * Build the marketplace query dynamically
- * while still using prepared statements.
- */
-
 $sql = "SELECT products.*, users.fullname AS seller_name
         FROM products
         INNER JOIN users
             ON products.user_id = users.id
         WHERE products.status = 'active'";
+
 $params = [];
 
 if($category != '')
@@ -37,11 +33,11 @@ if($category != '')
 if($search != '')
 {
     $sql .= " AND (
-    products.title LIKE ?
-    OR products.description LIKE ?
-    OR products.category LIKE ?
-    OR products.location LIKE ?
-)";
+        products.title LIKE ?
+        OR products.description LIKE ?
+        OR products.category LIKE ?
+        OR products.location LIKE ?
+    )";
 
     $searchTerm = "%" . $search . "%";
 
@@ -54,70 +50,75 @@ if($search != '')
 $sql .= " ORDER BY products.id DESC";
 
 $stmt = $pdo->prepare($sql);
-
 $stmt->execute($params);
 
 $products = $stmt;
 
 ?>
 
-<h2 style="padding:20px;">
-Marketplace
-</h2>
+<div class="marketplace-header">
 
-<form method="GET" style="padding:20px;">
+    <h2>
+        SafeTrade Marketplace
+    </h2>
 
-<input
-type="text"
-name="search"
-value="<?= htmlspecialchars($search); ?>"
-placeholder="Search products..."
-style="width:100%;padding:10px;margin-bottom:10px;"
->
+    <p>
+        Browse products from verified SafeTrade sellers.
+    </p>
 
-<select
-name="category"
-style="padding:10px;margin-bottom:10px;"
->
+</div>
 
-<option value="">
-All Categories
-</option>
+<form method="GET" class="marketplace-search">
 
-<option value="Electronics"
-<?= $category === 'Electronics' ? 'selected' : ''; ?>>
-Electronics
-</option>
+    <input
+        type="text"
+        name="search"
+        value="<?= htmlspecialchars($search); ?>"
+        placeholder="Search products..."
+    >
 
-<option value="Fashion"
-<?= $category === 'Fashion' ? 'selected' : ''; ?>>
-Fashion
-</option>
+    <select name="category">
 
-<option value="Vehicles"
-<?= $category === 'Vehicles' ? 'selected' : ''; ?>>
-Vehicles
-</option>
+        <option value="">
+            All Categories
+        </option>
 
-<option value="Property"
-<?= $category === 'Property' ? 'selected' : ''; ?>>
-Property
-</option>
+        <option value="Electronics"
+        <?= $category === 'Electronics' ? 'selected' : ''; ?>>
+            Electronics
+        </option>
 
-<option value="Services"
-<?= $category === 'Services' ? 'selected' : ''; ?>>
-Services
-</option>
+        <option value="Fashion"
+        <?= $category === 'Fashion' ? 'selected' : ''; ?>>
+            Fashion
+        </option>
 
-</select>
+        <option value="Vehicles"
+        <?= $category === 'Vehicles' ? 'selected' : ''; ?>>
+            Vehicles
+        </option>
 
-<button type="submit">
-Search / Filter
-</button>
+        <option value="Property"
+        <?= $category === 'Property' ? 'selected' : ''; ?>>
+            Property
+        </option>
 
-<a href="products.php">
-Clear
-</a>
+        <option value="Services"
+        <?= $category === 'Services' ? 'selected' : ''; ?>>
+            Services
+        </option>
+
+    </select>
+
+    <button type="submit">
+        Search / Filter
+    </button>
+
+    <a
+        href="products.php"
+        class="clear-link">
+        Clear
+    </a>
 
 </form>
 
@@ -129,9 +130,17 @@ if($products->rowCount() == 0)
 {
 ?>
 
-<p style="padding:20px;">
-No products found.
-</p>
+    <div class="empty-marketplace">
+
+        <h3>
+            No products found
+        </h3>
+
+        <p>
+            Try changing your search or category filter.
+        </p>
+
+    </div>
 
 <?php
 }
@@ -140,49 +149,51 @@ while($product = $products->fetch())
 {
 ?>
 
-<div class="card">
+    <div class="card">
 
-<?php if(!empty($product['image'])): ?>
+        <?php if(!empty($product['image'])): ?>
 
-<img
-src="uploads/products/<?= htmlspecialchars($product['image']); ?>"
->
+            <img
+                src="uploads/products/<?= htmlspecialchars($product['image']); ?>"
+                alt="<?= htmlspecialchars($product['title']); ?>"
+            >
 
-<?php endif; ?>
+        <?php endif; ?>
 
-<h3>
-<?= htmlspecialchars($product['title']); ?>
-</h3>
+        <h3>
+            <?= htmlspecialchars($product['title']); ?>
+        </h3>
 
-<p>
-R<?= htmlspecialchars($product['price']); ?>
-</p>
+        <p>
+            R<?= number_format((float)$product['price'], 2); ?>
+        </p>
 
-<p>
-Category:
-<?= htmlspecialchars($product['category']); ?>
-</p>
+        <p>
+            Category:
+            <?= htmlspecialchars($product['category']); ?>
+        </p>
 
-<p>
-Location:
-<?= htmlspecialchars($product['location']); ?>
-</p>
+        <p>
+            Location:
+            <?= htmlspecialchars($product['location']); ?>
+        </p>
 
-<p>
-Seller:
-<?= htmlspecialchars($product['seller_name']); ?>
-</p>
+        <p>
+            Seller:
+            <?= htmlspecialchars($product['seller_name']); ?>
+        </p>
 
-<p>
-Status:
-<?= htmlspecialchars($product['status']); ?>
-</p>
+        <p>
+            Status:
+            <?= htmlspecialchars(ucfirst($product['status'])); ?>
+        </p>
 
-<a href="product-details.php?id=<?= (int)$product['id']; ?>">
-View Details
-</a>
+        <a
+            href="product-details.php?id=<?= (int)$product['id']; ?>">
+            View Details
+        </a>
 
-</div>
+    </div>
 
 <?php
 }

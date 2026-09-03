@@ -33,112 +33,177 @@ include '../includes/header.php';
 
 ?>
 
-<div class="form-container">
+<div class="orders-page">
 
-<h2>
-My Orders
-</h2>
+    <div class="page-header">
 
-<?php
+        <div>
 
-if($orders->rowCount() == 0)
-{
-?>
+            <h1>
+                My Orders
+            </h1>
 
-<p>
-You have not placed any orders yet.
-</p>
+            <p>
+                Track your SafeTrade purchases and payment progress.
+            </p>
 
-<?php
-}
+        </div>
 
-while($order = $orders->fetch())
-{
-?>
+        <a href="../dashboard.php" class="secondary-btn">
+            Back to Dashboard
+        </a>
 
-<div class="card">
+    </div>
 
-<h3>
-<?= htmlspecialchars($order['product_title']); ?>
-</h3>
 
-<?php if(!empty($order['product_image'])): ?>
+    <?php if($orders->rowCount() == 0): ?>
 
-<img
-src="../uploads/products/<?= htmlspecialchars($order['product_image']); ?>"
-style="width:200px;"
->
+        <div class="empty-state">
 
-<?php endif; ?>
+            <h3>
+                No Orders Yet
+            </h3>
 
-<p>
-Seller:
-<?= htmlspecialchars($order['seller_name']); ?>
-</p>
+            <p>
+                You have not placed any orders yet.
+            </p>
 
-<p>
-Amount:
-R<?= number_format($order['amount'], 2); ?>
-</p>
+            <a href="../products.php" class="btn">
+                Browse Marketplace
+            </a>
 
-<p>
-Status:
-<strong>
-<?= htmlspecialchars(ucfirst($order['status'])); ?>
-</strong>
-</p>
+        </div>
 
-<?php if($order['status'] === 'accepted'): ?>
+    <?php else: ?>
 
-<a href="checkout.php?order_id=<?= (int)$order['id']; ?>">
-Proceed to Payment
-</a>
+        <div class="orders-grid">
 
-<br><br>
+            <?php while($order = $orders->fetch()): ?>
 
-<?php elseif($order['status'] === 'pending'): ?>
+                <div class="order-card">
 
-<p>
-Waiting for the seller to accept this order before payment.
-</p>
+                    <?php if(!empty($order['product_image'])): ?>
 
-<?php elseif($order['status'] === 'completed'): ?>
+                        <div class="order-image">
 
-<p>
-This order has been completed.
-</p>
+                            <img
+                                src="../uploads/products/<?= htmlspecialchars($order['product_image']); ?>"
+                                alt="<?= htmlspecialchars($order['product_title']); ?>"
+                            >
 
-<?php elseif($order['status'] === 'cancelled'): ?>
+                        </div>
 
-<p>
-This order has been cancelled.
-</p>
+                    <?php endif; ?>
 
-<?php endif; ?>
 
-<p>
-Order Date:
-<?= htmlspecialchars($order['created_at']); ?>
-</p>
+                    <div class="order-content">
 
-</div>
+                        <div class="order-card-header">
 
-<br>
+                            <div>
 
-<?php
-}
+                                <span class="order-number">
+                                    Order #<?= (int)$order['id']; ?>
+                                </span>
 
-?>
+                                <h3>
+                                    <?= htmlspecialchars($order['product_title']); ?>
+                                </h3>
 
-<a href="../dashboard.php">
-Back to Dashboard
-</a>
+                            </div>
 
-<br><br>
 
-<a href="../products.php">
-Back to Marketplace
-</a>
+                            <span class="order-status order-status-<?= htmlspecialchars($order['status']); ?>">
+
+                                <?= htmlspecialchars(ucfirst($order['status'])); ?>
+
+                            </span>
+
+                        </div>
+
+
+                        <div class="order-details">
+
+                            <p>
+                                <strong>Seller:</strong>
+                                <?= htmlspecialchars($order['seller_name']); ?>
+                            </p>
+
+                            <p>
+                                <strong>Amount:</strong>
+                                R<?= number_format((float)$order['amount'], 2); ?>
+                            </p>
+
+                            <p>
+                                <strong>Order Date:</strong>
+                                <?= htmlspecialchars($order['created_at']); ?>
+                            </p>
+
+                        </div>
+
+
+                        <div class="order-message">
+
+                            <?php if($order['status'] === 'accepted'): ?>
+
+                                <p>
+                                    The seller has accepted your order.
+                                    You can now proceed to payment.
+                                </p>
+
+                            <?php elseif($order['status'] === 'pending'): ?>
+
+                                <p>
+                                    Waiting for the seller to accept this order before payment.
+                                </p>
+
+                            <?php elseif($order['status'] === 'completed'): ?>
+
+                                <p>
+                                    This order has been completed successfully.
+                                </p>
+
+                            <?php elseif($order['status'] === 'cancelled'): ?>
+
+                                <p>
+                                    This order has been cancelled.
+                                </p>
+
+                            <?php endif; ?>
+
+                        </div>
+
+
+                        <?php if($order['status'] === 'accepted'): ?>
+
+                            <a
+                                href="checkout.php?order_id=<?= (int)$order['id']; ?>"
+                                class="payment-btn">
+
+                                Proceed to Payment
+
+                            </a>
+
+                        <?php endif; ?>
+
+                    </div>
+
+                </div>
+
+            <?php endwhile; ?>
+
+        </div>
+
+    <?php endif; ?>
+
+
+    <div class="page-bottom-actions">
+
+        <a href="../products.php" class="secondary-btn">
+            Browse Marketplace
+        </a>
+
+    </div>
 
 </div>
 

@@ -15,104 +15,195 @@ include '../includes/header.php';
 
 ?>
 
-<div class="form-container">
+<div class="admin-payments-page">
 
-<h2>
-Admin - All Payments
-</h2>
+    <div class="page-header">
 
-<p>
-View and monitor all payments made through SafeTrade.
-</p>
+        <div>
 
-<hr>
+            <h1>
+                Payment Monitoring
+            </h1>
 
-<?php
+            <p>
+                View and monitor all SafeTrade payment records.
+            </p>
 
-if($payments->rowCount() == 0)
-{
-?>
+        </div>
 
-<p>
-There are no payments in the system yet.
-</p>
+        <a href="index.php" class="secondary-btn">
+            Back to Admin Dashboard
+        </a>
 
-<?php
-}
+    </div>
 
-while($payment = $payments->fetch())
-{
-?>
 
-<div class="card">
+    <?php if($payments->rowCount() == 0): ?>
 
-<h3>
-<?= htmlspecialchars($payment['product_title']); ?>
-</h3>
+        <div class="empty-state">
 
-<p>
-<strong>Payment ID:</strong>
-<?= (int)$payment['id']; ?>
-</p>
+            <h3>
+                No Payments
+            </h3>
 
-<p>
-<strong>Order ID:</strong>
-<?= (int)$payment['order_id']; ?>
-</p>
+            <p>
+                There are currently no payment records in the system.
+            </p>
 
-<p>
-<strong>Buyer:</strong>
-<?= htmlspecialchars($payment['buyer_name']); ?>
-</p>
+        </div>
 
-<p>
-<strong>Seller:</strong>
-<?= htmlspecialchars($payment['seller_name']); ?>
-</p>
+    <?php else: ?>
 
-<p>
-<strong>Amount:</strong>
-R<?= number_format($payment['amount'], 2); ?>
-</p>
+        <div class="admin-payments-grid">
 
-<p>
-<strong>Payment Method:</strong>
-<?= htmlspecialchars($payment['payment_method']); ?>
-</p>
+            <?php while($payment = $payments->fetch()): ?>
 
-<p>
-<strong>Transaction Reference:</strong>
-<?= htmlspecialchars($payment['transaction_reference'] ?? 'Not provided'); ?>
-</p>
+                <div class="admin-payment-card">
 
-<p>
-<strong>Payment Status:</strong>
-<?= htmlspecialchars(ucfirst($payment['status'])); ?>
-</p>
+                    <div class="admin-payment-header">
 
-<p>
-<strong>Payment Date:</strong>
-<?= htmlspecialchars($payment['created_at']); ?>
-</p>
+                        <div>
 
-</div>
+                            <span class="payment-record-number">
+                                Payment #<?= (int)$payment['id']; ?>
+                            </span>
 
-<br>
+                            <h3>
+                                <?= htmlspecialchars($payment['product_title']); ?>
+                            </h3>
 
-<?php
-}
+                            <span class="payment-order-number">
+                                Order #<?= (int)$payment['order_id']; ?>
+                            </span>
 
-?>
+                        </div>
 
-<a href="../dashboard.php">
-Back to Dashboard
-</a>
 
-<br><br>
+                        <span class="payment-status-badge payment-status-<?= htmlspecialchars($payment['status']); ?>">
 
-<a href="orders.php">
-View All Orders
-</a>
+                            <?= htmlspecialchars(ucfirst($payment['status'])); ?>
+
+                        </span>
+
+                    </div>
+
+
+                    <div class="admin-payment-parties">
+
+                        <div class="admin-party-box">
+
+                            <span class="admin-party-label">
+                                Buyer
+                            </span>
+
+                            <strong>
+                                <?= htmlspecialchars($payment['buyer_name']); ?>
+                            </strong>
+
+                        </div>
+
+
+                        <div class="admin-party-box">
+
+                            <span class="admin-party-label">
+                                Seller
+                            </span>
+
+                            <strong>
+                                <?= htmlspecialchars($payment['seller_name']); ?>
+                            </strong>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="admin-payment-details">
+
+                        <div class="payment-detail-item">
+
+                            <span>
+                                Amount
+                            </span>
+
+                            <strong class="admin-payment-amount">
+                                R<?= number_format((float)$payment['amount'], 2); ?>
+                            </strong>
+
+                        </div>
+
+
+                        <div class="payment-detail-item">
+
+                            <span>
+                                Payment Method
+                            </span>
+
+                            <strong>
+                                <?= htmlspecialchars(
+                                    ucwords(
+                                        str_replace(
+                                            '_',
+                                            ' ',
+                                            $payment['payment_method']
+                                        )
+                                    )
+                                ); ?>
+                            </strong>
+
+                        </div>
+
+
+                        <div class="payment-detail-item">
+
+                            <span>
+                                Transaction Reference
+                            </span>
+
+                            <strong>
+                                <?= htmlspecialchars(
+                                    $payment['transaction_reference']
+                                    ?? 'Not provided'
+                                ); ?>
+                            </strong>
+
+                        </div>
+
+
+                        <div class="payment-detail-item">
+
+                            <span>
+                                Payment Date
+                            </span>
+
+                            <strong>
+                                <?= htmlspecialchars($payment['created_at']); ?>
+                            </strong>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            <?php endwhile; ?>
+
+        </div>
+
+    <?php endif; ?>
+
+
+    <div class="page-bottom-actions">
+
+        <a href="index.php" class="secondary-btn">
+            Admin Dashboard
+        </a>
+
+        <a href="orders.php" class="secondary-btn">
+            Order Monitoring
+        </a>
+
+    </div>
 
 </div>
 

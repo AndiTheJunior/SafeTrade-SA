@@ -42,104 +42,180 @@ include '../includes/header.php';
 
 ?>
 
-<div class="form-container">
+<div class="admin-orders-page">
 
-<h2>
-Admin - All Orders
-</h2>
+    <div class="page-header">
 
-<p>
-View and monitor all buyer and seller orders.
-</p>
+        <div>
 
-<hr>
+            <h1>
+                Order Monitoring
+            </h1>
 
-<?php
+            <p>
+                View and monitor all buyer and seller orders on SafeTrade.
+            </p>
 
-if($orders->rowCount() == 0)
-{
-?>
+        </div>
 
-<p>
-There are no orders in the system yet.
-</p>
+        <a href="index.php" class="secondary-btn">
+            Back to Admin Dashboard
+        </a>
 
-<?php
-}
+    </div>
 
-while($order = $orders->fetch())
-{
-?>
 
-<div class="card">
+    <?php if($orders->rowCount() == 0): ?>
 
-<h3>
-<?= htmlspecialchars($order['product_title']); ?>
-</h3>
+        <div class="empty-state">
 
-<?php if(!empty($order['product_image'])): ?>
+            <h3>
+                No Orders
+            </h3>
 
-<img
-src="../uploads/products/<?= htmlspecialchars($order['product_image']); ?>"
-style="width:200px;"
->
+            <p>
+                There are currently no orders in the system.
+            </p>
 
-<?php endif; ?>
+        </div>
 
-<p>
-<strong>Order ID:</strong>
-<?= (int)$order['id']; ?>
-</p>
+    <?php else: ?>
 
-<p>
-<strong>Buyer:</strong>
-<?= htmlspecialchars($order['buyer_name']); ?>
-</p>
+        <div class="admin-orders-grid">
 
-<p>
-<strong>Buyer Email:</strong>
-<?= htmlspecialchars($order['buyer_email']); ?>
-</p>
+            <?php while($order = $orders->fetch()): ?>
 
-<p>
-<strong>Seller:</strong>
-<?= htmlspecialchars($order['seller_name']); ?>
-</p>
+                <div class="admin-order-card">
 
-<p>
-<strong>Seller Email:</strong>
-<?= htmlspecialchars($order['seller_email']); ?>
-</p>
+                    <?php if(!empty($order['product_image'])): ?>
 
-<p>
-<strong>Amount:</strong>
-R<?= number_format($order['amount'], 2); ?>
-</p>
+                        <div class="admin-order-image">
 
-<p>
-<strong>Status:</strong>
+                            <img
+                                src="../uploads/products/<?= htmlspecialchars($order['product_image']); ?>"
+                                alt="<?= htmlspecialchars($order['product_title']); ?>"
+                            >
 
-<?= htmlspecialchars(ucfirst($order['status'])); ?>
+                        </div>
 
-</p>
+                    <?php endif; ?>
 
-<p>
-<strong>Order Date:</strong>
-<?= htmlspecialchars($order['created_at']); ?>
-</p>
 
-</div>
+                    <div class="admin-order-content">
 
-<br>
+                        <div class="admin-order-header">
 
-<?php
-}
+                            <div>
 
-?>
+                                <span class="order-number">
+                                    Order #<?= (int)$order['id']; ?>
+                                </span>
 
-<a href="../dashboard.php">
-Back to Dashboard
-</a>
+                                <h3>
+                                    <?= htmlspecialchars($order['product_title']); ?>
+                                </h3>
+
+                            </div>
+
+
+                            <span class="order-status order-status-<?= htmlspecialchars($order['status']); ?>">
+
+                                <?= htmlspecialchars(ucfirst($order['status'])); ?>
+
+                            </span>
+
+                        </div>
+
+
+                        <div class="admin-order-parties">
+
+                            <div class="admin-party-box">
+
+                                <span class="admin-party-label">
+                                    Buyer
+                                </span>
+
+                                <strong>
+                                    <?= htmlspecialchars($order['buyer_name']); ?>
+                                </strong>
+
+                                <p>
+                                    <?= htmlspecialchars($order['buyer_email']); ?>
+                                </p>
+
+                            </div>
+
+
+                            <div class="admin-party-box">
+
+                                <span class="admin-party-label">
+                                    Seller
+                                </span>
+
+                                <strong>
+                                    <?= htmlspecialchars($order['seller_name']); ?>
+                                </strong>
+
+                                <p>
+                                    <?= htmlspecialchars($order['seller_email']); ?>
+                                </p>
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="admin-order-meta">
+
+                            <div>
+
+                                <span>
+                                    Amount
+                                </span>
+
+                                <strong class="admin-order-amount">
+                                    R<?= number_format((float)$order['amount'], 2); ?>
+                                </strong>
+
+                            </div>
+
+
+                            <div>
+
+                                <span>
+                                    Order Date
+                                </span>
+
+                                <strong>
+                                    <?= htmlspecialchars($order['created_at']); ?>
+                                </strong>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            <?php endwhile; ?>
+
+        </div>
+
+    <?php endif; ?>
+
+
+    <div class="page-bottom-actions">
+
+        <a href="index.php" class="secondary-btn">
+            Admin Dashboard
+        </a>
+
+        <a href="payments.php" class="secondary-btn">
+            Payment Monitoring
+        </a>
+
+    </div>
 
 </div>
 

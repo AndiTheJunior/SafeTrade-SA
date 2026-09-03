@@ -7,6 +7,8 @@ include '../config/database.php';
 requireRole('seller');
 
 $message = "";
+$messageType = "";
+
 
 /*
  * Accept an order.
@@ -33,13 +35,16 @@ if(isset($_POST['accept_order']))
         if($stmt->rowCount() === 1)
         {
             $message = "Order accepted successfully.";
+            $messageType = "success";
         }
         else
         {
             $message = "The order could not be accepted.";
+            $messageType = "error";
         }
     }
 }
+
 
 /*
  * Cancel an order and return the product
@@ -55,9 +60,6 @@ if(isset($_POST['cancel_order']))
         {
             $pdo->beginTransaction();
 
-            /*
-             * Find the order belonging to the logged-in seller.
-             */
             $orderStmt = $pdo->prepare(
                 "SELECT product_id
                  FROM orders
@@ -76,12 +78,11 @@ if(isset($_POST['cancel_order']))
 
             if(!$order)
             {
-                throw new Exception("The order could not be cancelled.");
+                throw new Exception(
+                    "The order could not be cancelled."
+                );
             }
 
-            /*
-             * Cancel the order.
-             */
             $cancelStmt = $pdo->prepare(
                 "UPDATE orders
                  SET status = 'cancelled'
@@ -97,12 +98,11 @@ if(isset($_POST['cancel_order']))
 
             if($cancelStmt->rowCount() !== 1)
             {
-                throw new Exception("The order could not be cancelled.");
+                throw new Exception(
+                    "The order could not be cancelled."
+                );
             }
 
-            /*
-             * Return the product to the marketplace.
-             */
             $productStmt = $pdo->prepare(
                 "UPDATE products
                  SET status = 'active'
@@ -116,12 +116,18 @@ if(isset($_POST['cancel_order']))
 
             if($productStmt->rowCount() !== 1)
             {
-                throw new Exception("The product could not be returned to the marketplace.");
+                throw new Exception(
+                    "The product could not be returned to the marketplace."
+                );
             }
 
             $pdo->commit();
 
-            $message = "Order cancelled successfully. The product is available again.";
+            $message =
+                "Order cancelled successfully. " .
+                "The product is available again.";
+
+            $messageType = "success";
         }
         catch(Exception $e)
         {
@@ -131,9 +137,11 @@ if(isset($_POST['cancel_order']))
             }
 
             $message = $e->getMessage();
+            $messageType = "error";
         }
     }
 }
+
 
 /*
  * Complete an order.
@@ -160,13 +168,16 @@ if(isset($_POST['complete_order']))
         if($stmt->rowCount() === 1)
         {
             $message = "Order marked as completed.";
+            $messageType = "success";
         }
         else
         {
             $message = "The order could not be completed.";
+            $messageType = "error";
         }
     }
 }
+
 
 /*
  * Get all orders for the logged-in seller.
@@ -197,165 +208,261 @@ include '../includes/header.php';
 
 ?>
 
-<div class="form-container">
+<div class="orders-page">
 
-<h2>
-Seller Orders
-</h2>
+    <div class="page-header">
 
-<?php if($message): ?>
+        <div>
 
-<p>
-<?= htmlspecialchars($message); ?>
-</p>
+            <h1>
+                Seller Orders
+            </h1>
 
-<?php endif; ?>
+            <p>
+                Review and manage orders placed for your products.
+            </p>
 
-<?php
+        </div>
 
-if($orders->rowCount() == 0)
-{
-?>
+        <a href="../dashboard.php" class="secondary-btn">
+            Back to Dashboard
+        </a>
 
-<p>
-You have not received any orders yet.
-</p>
+    </div>
 
-<?php
-}
 
-while($order = $orders->fetch())
-{
-?>
+    <?php if($message): ?>
 
-<div class="card">
+        <div class="status-message <?= htmlspecialchars($messageType); ?>">
+            <?= htmlspecialchars($message); ?>
+        </div>
 
-<h3>
-<?= htmlspecialchars($order['product_title']); ?>
-</h3>
+    <?php endif; ?>
 
-<?php if(!empty($order['product_image'])): ?>
 
-<img
-src="../uploads/products/<?= htmlspecialchars($order['product_image']); ?>"
-style="width:200px;"
->
+    <?php if($orders->rowCount() == 0): ?>
 
-<?php endif; ?>
+        <div class="empty-state">
 
-<p>
-Buyer:
-<?= htmlspecialchars($order['buyer_name']); ?>
-</p>
+            <h3>
+                No Orders Yet
+            </h3>
 
-<p>
-Buyer Email:
-<?= htmlspecialchars($order['buyer_email']); ?>
-</p>
+            <p>
+                You have not received any orders yet.
+            </p>
 
-<p>
-Buyer Phone:
-<?= htmlspecialchars($order['buyer_phone'] ?? 'Not provided'); ?>
-</p>
+            <a href="../products.php" class="btn">
+                View Marketplace
+            </a>
 
-<p>
-Amount:
-R<?= number_format($order['amount'], 2); ?>
-</p>
+        </div>
 
-<p>
-Status:
-<strong>
-<?= htmlspecialchars(ucfirst($order['status'])); ?>
-</strong>
-</p>
+    <?php else: ?>
 
-<p>
-Order Date:
-<?= htmlspecialchars($order['created_at']); ?>
-</p>
+        <div class="orders-grid">
 
-<?php if($order['status'] === 'pending'): ?>
+            <?php while($order = $orders->fetch()): ?>
 
-<form method="POST">
+                <div class="order-card
+                    <?= empty($order['product_image']) ? 'order-card-no-image' : ''; ?>">
 
-<input
-type="hidden"
-name="order_id"
-value="<?= (int)$order['id']; ?>">
+                    <?php if(!empty($order['product_image'])): ?>
 
-<button
-type="submit"
-name="accept_order">
-Accept Order
-</button>
+                        <div class="order-image">
 
-<button
-type="submit"
-name="cancel_order"
-onclick="return confirm('Are you sure you want to cancel this order?');">
-Cancel Order
-</button>
+                            <img
+                                src="../uploads/products/<?= htmlspecialchars($order['product_image']); ?>"
+                                alt="<?= htmlspecialchars($order['product_title']); ?>"
+                            >
 
-</form>
+                        </div>
 
-<?php elseif($order['status'] === 'accepted'): ?>
+                    <?php endif; ?>
 
-<form method="POST">
 
-<input
-type="hidden"
-name="order_id"
-value="<?= (int)$order['id']; ?>">
+                    <div class="order-content">
 
-<button
-type="submit"
-name="complete_order"
-onclick="return confirm('Mark this order as completed?');">
-Complete Order
-</button>
+                        <div class="order-card-header">
 
-<button
-type="submit"
-name="cancel_order"
-onclick="return confirm('Are you sure you want to cancel this order?');">
-Cancel Order
-</button>
+                            <div>
 
-</form>
+                                <span class="order-number">
+                                    Order #<?= (int)$order['id']; ?>
+                                </span>
 
-<?php elseif($order['status'] === 'completed'): ?>
+                                <h3>
+                                    <?= htmlspecialchars($order['product_title']); ?>
+                                </h3>
 
-<p>
-This order has been completed.
-</p>
+                            </div>
 
-<?php elseif($order['status'] === 'cancelled'): ?>
 
-<p>
-This order has been cancelled.
-</p>
+                            <span class="order-status order-status-<?= htmlspecialchars($order['status']); ?>">
 
-<?php endif; ?>
+                                <?= htmlspecialchars(ucfirst($order['status'])); ?>
 
-</div>
+                            </span>
 
-<br>
+                        </div>
 
-<?php
-}
 
-?>
+                        <div class="order-details">
 
-<a href="../dashboard.php">
-Back to Dashboard
-</a>
+                            <p>
+                                <strong>Buyer:</strong>
+                                <?= htmlspecialchars($order['buyer_name']); ?>
+                            </p>
 
-<br><br>
+                            <p>
+                                <strong>Email:</strong>
+                                <?= htmlspecialchars($order['buyer_email']); ?>
+                            </p>
 
-<a href="../products.php">
-Back to Marketplace
-</a>
+                            <p>
+                                <strong>Phone:</strong>
+                                <?= htmlspecialchars(
+                                    $order['buyer_phone'] ?? 'Not provided'
+                                ); ?>
+                            </p>
+
+                            <p>
+                                <strong>Amount:</strong>
+                                R<?= number_format((float)$order['amount'], 2); ?>
+                            </p>
+
+                            <p>
+                                <strong>Order Date:</strong>
+                                <?= htmlspecialchars($order['created_at']); ?>
+                            </p>
+
+                        </div>
+
+
+                        <div class="order-message">
+
+                            <?php if($order['status'] === 'pending'): ?>
+
+                                <p>
+                                    This order is waiting for your response.
+                                    Accept it to allow the buyer to proceed
+                                    to payment.
+                                </p>
+
+                            <?php elseif($order['status'] === 'accepted'): ?>
+
+                                <p>
+                                    You have accepted this order.
+                                    Complete it when the transaction has
+                                    been successfully concluded.
+                                </p>
+
+                            <?php elseif($order['status'] === 'completed'): ?>
+
+                                <p>
+                                    This order has been completed.
+                                </p>
+
+                            <?php elseif($order['status'] === 'cancelled'): ?>
+
+                                <p>
+                                    This order has been cancelled and the
+                                    product has been returned to the marketplace.
+                                </p>
+
+                            <?php endif; ?>
+
+                        </div>
+
+
+                        <?php if($order['status'] === 'pending'): ?>
+
+                            <form
+                                method="POST"
+                                class="seller-order-actions">
+
+                                <input
+                                    type="hidden"
+                                    name="order_id"
+                                    value="<?= (int)$order['id']; ?>"
+                                >
+
+                                <button
+                                    type="submit"
+                                    name="accept_order"
+                                    class="accept-order-btn">
+
+                                    Accept Order
+
+                                </button>
+
+                                <button
+                                    type="submit"
+                                    name="cancel_order"
+                                    class="cancel-order-btn"
+                                    onclick="return confirm('Are you sure you want to cancel this order?');">
+
+                                    Cancel Order
+
+                                </button>
+
+                            </form>
+
+
+                        <?php elseif($order['status'] === 'accepted'): ?>
+
+                            <form
+                                method="POST"
+                                class="seller-order-actions">
+
+                                <input
+                                    type="hidden"
+                                    name="order_id"
+                                    value="<?= (int)$order['id']; ?>"
+                                >
+
+                                <button
+                                    type="submit"
+                                    name="complete_order"
+                                    class="complete-order-btn"
+                                    onclick="return confirm('Mark this order as completed?');">
+
+                                    Complete Order
+
+                                </button>
+
+                                <button
+                                    type="submit"
+                                    name="cancel_order"
+                                    class="cancel-order-btn"
+                                    onclick="return confirm('Are you sure you want to cancel this order?');">
+
+                                    Cancel Order
+
+                                </button>
+
+                            </form>
+
+                        <?php endif; ?>
+
+                    </div>
+
+                </div>
+
+            <?php endwhile; ?>
+
+        </div>
+
+    <?php endif; ?>
+
+
+    <div class="page-bottom-actions">
+
+        <a href="../products.php" class="secondary-btn">
+            View Marketplace
+        </a>
+
+    </div>
 
 </div>
 

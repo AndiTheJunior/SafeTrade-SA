@@ -1,12 +1,15 @@
 <?php
 
 include 'includes/auth.php';
+include 'includes/role-auth.php';
 include 'config/database.php';
+
+requireRole('seller');
 
 $user_id = $_SESSION['user_id'];
 
 $stmt = $pdo->prepare(
-    "SELECT fullname, verification_status
+    "SELECT fullname, email, verification_status
      FROM users
      WHERE id = ?"
 );
@@ -24,6 +27,7 @@ if(!$user)
 }
 
 $message = "";
+$messageType = "";
 
 if(isset($_POST['request_verification']))
 {
@@ -32,16 +36,26 @@ if(isset($_POST['request_verification']))
         $update = $pdo->prepare(
             "UPDATE users
              SET verification_status = 'pending'
-             WHERE id = ?"
+             WHERE id = ?
+             AND verification_status = 'unverified'"
         );
 
         $update->execute([
             $user_id
         ]);
 
-        $message = "Your verification request has been submitted.";
+        if($update->rowCount() === 1)
+        {
+            $message = "Your verification request has been submitted successfully.";
+            $messageType = "success";
 
-        $user['verification_status'] = 'pending';
+            $user['verification_status'] = 'pending';
+        }
+        else
+        {
+            $message = "Your verification request could not be submitted.";
+            $messageType = "error";
+        }
     }
 }
 
@@ -49,70 +63,142 @@ include 'includes/header.php';
 
 ?>
 
-<div class="form-container">
+<div class="account-verification-page">
 
-<h2>
-Account Verification
-</h2>
+    <div class="page-header">
 
-<p>
-Welcome,
-<?= htmlspecialchars($user['fullname']); ?>
-</p>
+        <div>
 
-<p>
+            <h1>
+                Account Verification
+            </h1>
 
-Verification status:
+            <p>
+                Manage your SafeTrade seller verification status.
+            </p>
 
-<strong>
+        </div>
 
-<?= htmlspecialchars($user['verification_status']); ?>
+        <a href="dashboard.php" class="secondary-btn">
+            Back to Dashboard
+        </a>
 
-</strong>
+    </div>
 
-</p>
 
-<?php if($message): ?>
+    <?php if($message): ?>
 
-<p>
-<?= htmlspecialchars($message); ?>
-</p>
+        <div class="status-message <?= htmlspecialchars($messageType); ?>">
 
-<?php endif; ?>
+            <?= htmlspecialchars($message); ?>
 
-<?php if($user['verification_status'] === 'unverified'): ?>
+        </div>
 
-<form method="POST">
+    <?php endif; ?>
 
-<button
-type="submit"
-name="request_verification">
 
-Request Verification
+    <div class="verification-profile">
 
-</button>
+        <div class="verification-profile-header">
 
-</form>
+            <div>
 
-<?php elseif($user['verification_status'] === 'pending'): ?>
+                <h2>
+                    <?= htmlspecialchars($user['fullname']); ?>
+                </h2>
 
-<p>
-Your verification request is waiting for admin approval.
-</p>
+                <p>
+                    <?= htmlspecialchars($user['email']); ?>
+                </p>
 
-<?php elseif($user['verification_status'] === 'verified'): ?>
+            </div>
 
-<p>
-Your account has been verified.
-</p>
 
-<?php endif; ?>
+            <span class="verification-status
+                verification-status-<?= htmlspecialchars($user['verification_status']); ?>">
 
-<br>
+                <?= htmlspecialchars(ucfirst($user['verification_status'])); ?>
 
-<a href="dashboard.php">
-Back to Dashboard
-</a>
+            </span>
+
+        </div>
+
+
+        <div class="verification-content">
+
+            <?php if($user['verification_status'] === 'unverified'): ?>
+
+                <h3>
+                    Become a Verified Seller
+                </h3>
+
+                <p>
+                    Request account verification to show buyers that your
+                    SafeTrade seller account has been reviewed.
+                </p>
+
+                <p>
+                    Once submitted, an administrator will review your request.
+                </p>
+
+                <form method="POST">
+
+                    <button
+                        type="submit"
+                        name="request_verification"
+                        class="verification-request-btn">
+
+                        Request Verification
+
+                    </button>
+
+                </form>
+
+
+            <?php elseif($user['verification_status'] === 'pending'): ?>
+
+                <div class="verification-info-box pending">
+
+                    <h3>
+                        Verification Pending
+                    </h3>
+
+                    <p>
+                        Your request has been submitted and is currently
+                        waiting for administrator approval.
+                    </p>
+
+                    <p>
+                        You do not need to submit another request.
+                    </p>
+
+                </div>
+
+
+            <?php elseif($user['verification_status'] === 'verified'): ?>
+
+                <div class="verification-info-box verified">
+
+                    <h3>
+                        Verified Seller
+                    </h3>
+
+                    <p>
+                        Your SafeTrade seller account has been verified.
+                    </p>
+
+                    <p>
+                        Your verified status can be shown to buyers on
+                        your marketplace listings.
+                    </p>
+
+                </div>
+
+            <?php endif; ?>
+
+        </div>
+
+    </div>
 
 </div>
 

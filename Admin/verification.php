@@ -10,9 +10,11 @@ include '../config/database.php';
 requireRole('admin');
 
 $message = "";
+$messageType = "";
+
 
 /*
- * Approve a verification request.
+ * Approve verification request
  */
 if(isset($_POST['approve']))
 {
@@ -31,12 +33,22 @@ if(isset($_POST['approve']))
             $user_id
         ]);
 
-        $message = "User verification approved.";
+        if($stmt->rowCount() === 1)
+        {
+            $message = "Seller verification approved successfully.";
+            $messageType = "success";
+        }
+        else
+        {
+            $message = "The verification request could not be approved.";
+            $messageType = "error";
+        }
     }
 }
 
+
 /*
- * Reject a verification request.
+ * Reject verification request
  */
 if(isset($_POST['reject']))
 {
@@ -55,12 +67,22 @@ if(isset($_POST['reject']))
             $user_id
         ]);
 
-        $message = "Verification request rejected.";
+        if($stmt->rowCount() === 1)
+        {
+            $message = "Verification request rejected.";
+            $messageType = "success";
+        }
+        else
+        {
+            $message = "The verification request could not be rejected.";
+            $messageType = "error";
+        }
     }
 }
 
+
 /*
- * Get all pending verification requests.
+ * Get pending verification requests
  */
 $stmt = $pdo->prepare(
     "SELECT id, fullname, email, phone, role, created_at
@@ -77,100 +99,131 @@ include '../includes/header.php';
 
 ?>
 
-<div class="form-container">
+<div class="verification-page">
 
-<h2>
-Verification Requests
-</h2>
+    <div class="page-header">
 
-<?php if($message): ?>
+        <div>
 
-<p>
-<?= htmlspecialchars($message); ?>
-</p>
+            <h1>
+                Seller Verification
+            </h1>
 
-<?php endif; ?>
+            <p>
+                Review pending SafeTrade seller verification requests.
+            </p>
 
-<?php
+        </div>
 
-if($requests->rowCount() == 0)
-{
-?>
+        <a href="index.php" class="secondary-btn">
+            Back to Admin Dashboard
+        </a>
 
-<p>
-There are no pending verification requests.
-</p>
+    </div>
 
-<?php
-}
 
-while($user = $requests->fetch())
-{
-?>
+    <?php if($message): ?>
 
-<div class="card">
+        <div class="status-message <?= htmlspecialchars($messageType); ?>">
 
-<h3>
-<?= htmlspecialchars($user['fullname']); ?>
-</h3>
+            <?= htmlspecialchars($message); ?>
 
-<p>
-Email:
-<?= htmlspecialchars($user['email']); ?>
-</p>
+        </div>
 
-<p>
-Phone:
-<?= htmlspecialchars($user['phone'] ?? 'Not provided'); ?>
-</p>
+    <?php endif; ?>
 
-<p>
-Role:
-<?= htmlspecialchars($user['role']); ?>
-</p>
 
-<p>
-Registered:
-<?= htmlspecialchars($user['created_at']); ?>
-</p>
+    <?php if($requests->rowCount() == 0): ?>
 
-<form method="POST">
+        <div class="empty-state">
 
-<input
-type="hidden"
-name="user_id"
-value="<?= (int)$user['id']; ?>">
+            <h3>
+                No Pending Requests
+            </h3>
 
-<button
-type="submit"
-name="approve">
+            <p>
+                There are currently no seller verification requests waiting for review.
+            </p>
 
-Approve
+        </div>
 
-</button>
+    <?php else: ?>
 
-<button
-type="submit"
-name="reject">
+        <div class="verification-grid">
 
-Reject
+            <?php while($user = $requests->fetch()): ?>
 
-</button>
+                <div class="verification-card">
 
-</form>
+                    <div class="verification-card-header">
 
-</div>
+                        <h3>
+                            <?= htmlspecialchars($user['fullname']); ?>
+                        </h3>
 
-<br>
+                        <span class="pending-badge">
+                            Pending
+                        </span>
 
-<?php
-}
+                    </div>
 
-?>
 
-<a href="dashboard.php">
-Back to Admin Dashboard
-</a>
+                    <div class="verification-details">
+
+                        <p>
+                            <strong>Email:</strong>
+                            <?= htmlspecialchars($user['email']); ?>
+                        </p>
+
+                        <p>
+                            <strong>Phone:</strong>
+                            <?= htmlspecialchars($user['phone'] ?? 'Not provided'); ?>
+                        </p>
+
+                        <p>
+                            <strong>Role:</strong>
+                            <?= htmlspecialchars(ucfirst($user['role'])); ?>
+                        </p>
+
+                        <p>
+                            <strong>Registered:</strong>
+                            <?= htmlspecialchars($user['created_at']); ?>
+                        </p>
+
+                    </div>
+
+
+                    <form method="POST" class="verification-actions">
+
+                        <input
+                            type="hidden"
+                            name="user_id"
+                            value="<?= (int)$user['id']; ?>"
+                        >
+
+                        <button
+                            type="submit"
+                            name="approve"
+                            class="approve-btn">
+                            Approve
+                        </button>
+
+                        <button
+                            type="submit"
+                            name="reject"
+                            class="reject-btn">
+                            Reject
+                        </button>
+
+                    </form>
+
+                </div>
+
+            <?php endwhile; ?>
+
+        </div>
+
+    <?php endif; ?>
 
 </div>
 
