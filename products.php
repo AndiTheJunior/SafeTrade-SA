@@ -4,126 +4,200 @@ include 'config/database.php';
 include 'includes/header.php';
 
 $category = '';
+$search = '';
 
 if(isset($_GET['category']))
 {
-    $category = $_GET['category'];
+    $category = trim($_GET['category']);
 }
+
+if(isset($_GET['search']))
+{
+    $search = trim($_GET['search']);
+}
+
+$sql = "SELECT products.*, users.fullname AS seller_name
+        FROM products
+        INNER JOIN users
+            ON products.user_id = users.id
+        WHERE products.status = 'active'";
+
+$params = [];
 
 if($category != '')
 {
-    $stmt = $pdo->prepare(
-        "SELECT * FROM products
-         WHERE category = ?
-         ORDER BY id DESC"
-    );
-
-    $stmt->execute([$category]);
-
-    $products = $stmt;
+    $sql .= " AND products.category = ?";
+    $params[] = $category;
 }
-else
+
+if($search != '')
 {
-    $products = $pdo->query(
-        "SELECT * FROM products
-         ORDER BY id DESC"
-    );
+    $sql .= " AND (
+        products.title LIKE ?
+        OR products.description LIKE ?
+        OR products.category LIKE ?
+        OR products.location LIKE ?
+    )";
+
+    $searchTerm = "%" . $search . "%";
+
+    $params[] = $searchTerm;
+    $params[] = $searchTerm;
+    $params[] = $searchTerm;
+    $params[] = $searchTerm;
 }
+
+$sql .= " ORDER BY products.id DESC";
+
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
+
+$products = $stmt;
 
 ?>
 
-<form method="GET" style="padding:20px;">
+<div class="marketplace-header">
 
-<select name="category">
+    <h2>
+        SafeTrade Marketplace
+    </h2>
 
-<option value="">
-All Categories
-</option>
+    <p>
+        Browse products from verified SafeTrade sellers.
+    </p>
 
-<option value="Electronics">
-Electronics
-</option>
+</div>
 
-<option value="Fashion">
-Fashion
-</option>
+<form method="GET" class="marketplace-search">
 
-<option value="Vehicles">
-Vehicles
-</option>
+    <input
+        type="text"
+        name="search"
+        value="<?= htmlspecialchars($search); ?>"
+        placeholder="Search products..."
+    >
 
-<option value="Property">
-Property
-</option>
+    <select name="category">
 
-<option value="Services">
-Services
-</option>
+        <option value="">
+            All Categories
+        </option>
 
-</select>
+        <option value="Electronics"
+        <?= $category === 'Electronics' ? 'selected' : ''; ?>>
+            Electronics
+        </option>
 
-<button type="submit">
-Filter
-</button>
+        <option value="Fashion"
+        <?= $category === 'Fashion' ? 'selected' : ''; ?>>
+            Fashion
+        </option>
+
+        <option value="Vehicles"
+        <?= $category === 'Vehicles' ? 'selected' : ''; ?>>
+            Vehicles
+        </option>
+
+        <option value="Property"
+        <?= $category === 'Property' ? 'selected' : ''; ?>>
+            Property
+        </option>
+
+        <option value="Services"
+        <?= $category === 'Services' ? 'selected' : ''; ?>>
+            Services
+        </option>
+
+    </select>
+
+    <button type="submit">
+        Search / Filter
+    </button>
+
+    <a
+        href="products.php"
+        class="clear-link">
+        Clear
+    </a>
 
 </form>
-
-<h2 style="padding:20px;">
-Marketplace
-</h2>
-
-<input
-type="text"
-id="searchInput"
-onkeyup="searchProducts()"
-placeholder="Search products..."
-style="width:100%;padding:10px;margin-bottom:20px;">
 
 <div class="products">
 
 <?php
-while(
-$product =
-$products->fetch()
-)
+
+if($products->rowCount() == 0)
 {
 ?>
 
-<div class="card">
+    <div class="empty-marketplace">
 
-<img
-src="uploads/products/<?=
-$product['image']
-?>">
+        <h3>
+            No products found
+        </h3>
 
-<h3>
-<?= $product['title']; ?>
-</h3>
+        <p>
+            Try changing your search or category filter.
+        </p>
 
-<p>
-R<?= $product['price']; ?>
-</p>
+    </div>
 
-<p>
-Category:
-<?= $product['category']; ?>
-</p>
+<?php
+}
 
-<p>
-<?= $product['location']; ?>
-</p>
+while($product = $products->fetch())
+{
+?>
 
-<a href=
-"product-details.php?id=
-<?= $product['id']; ?>">
+    <div class="card">
 
-View Details
+        <?php if(!empty($product['image'])): ?>
 
-</a>
+            <img
+                src="uploads/products/<?= htmlspecialchars($product['image']); ?>"
+                alt="<?= htmlspecialchars($product['title']); ?>"
+            >
 
-</div>
+        <?php endif; ?>
 
-<?php } ?>
+        <h3>
+            <?= htmlspecialchars($product['title']); ?>
+        </h3>
+
+        <p>
+            R<?= number_format((float)$product['price'], 2); ?>
+        </p>
+
+        <p>
+            Category:
+            <?= htmlspecialchars($product['category']); ?>
+        </p>
+
+        <p>
+            Location:
+            <?= htmlspecialchars($product['location']); ?>
+        </p>
+
+        <p>
+            Seller:
+            <?= htmlspecialchars($product['seller_name']); ?>
+        </p>
+
+        <p>
+            Status:
+            <?= htmlspecialchars(ucfirst($product['status'])); ?>
+        </p>
+
+        <a
+            href="product-details.php?id=<?= (int)$product['id']; ?>">
+            View Details
+        </a>
+
+    </div>
+
+<?php
+}
+?>
 
 </div>
 

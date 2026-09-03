@@ -1,0 +1,43 @@
+# Composer dependencies
+/vendor/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Database/local configuration
+*.sql
+*.sqlite
+*.sqlite3
+
+# Uploaded files
+/uploads/
+/assets/uploads/
+
+# PHP/AMPPS temporary files
+*.log
+*.tmp
+
+# Operating system files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE/editor files
+.vscode/
+.idea/
+
+# PHPUnit/cache/coverage
+.phpunit.result.cache
+.phpunit.cache/
+coverage/
+
+# Node dependencies (if added later)
+node_modules/
+
+# Build/output directories
+dist/
+build/
+# Track the canonical SafeTrade database schema
+!database/schema.sql

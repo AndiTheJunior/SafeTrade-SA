@@ -1,63 +1,156 @@
 <?php
 
+include '../includes/auth.php';
+include '../includes/role-auth.php';
 include '../config/database.php';
 
-$users =
-$pdo->query(
-"SELECT * FROM users ORDER BY id DESC"
+requireRole('admin');
+
+$stmt = $pdo->prepare(
+    "SELECT id,
+            fullname,
+            email,
+            phone,
+            role,
+            verification_status,
+            created_at
+     FROM users
+     ORDER BY id DESC"
 );
 
+$stmt->execute();
+
+$users = $stmt;
+
+include '../includes/header.php';
+
 ?>
 
-<!DOCTYPE html>
-<html>
-<head>
-<title>Users</title>
-</head>
+<div class="admin-table-page">
 
-<body>
+    <div class="page-header">
 
-<h1>Registered Users</h1>
+        <div>
 
-<table border="1">
+            <h1>
+                User Management
+            </h1>
 
-<tr>
-<th>ID</th>
-<th>Name</th>
-<th>Email</th>
-<th>Phone</th>
-</tr>
+            <p>
+                View registered SafeTrade users and their account status.
+            </p>
 
-<?php
-while($user = $users->fetch())
-{
-?>
+        </div>
 
-<tr>
+        <a href="index.php" class="secondary-btn">
+            Back to Admin Dashboard
+        </a>
 
-<td>
-<?php echo $user['id']; ?>
-</td>
+    </div>
 
-<td>
-<?php echo $user['fullname']; ?>
-</td>
 
-<td>
-<?php echo $user['email']; ?>
-</td>
+    <?php if($users->rowCount() == 0): ?>
 
-<td>
-<?php echo $user['phone']; ?>
-</td>
+        <div class="empty-state">
 
-</tr>
+            <h3>
+                No Users
+            </h3>
 
-<?php
-}
-?>
+            <p>
+                There are currently no registered users.
+            </p>
 
-</table>
+        </div>
 
-</body>
-</html>
+    <?php else: ?>
+
+        <div class="admin-table-wrapper">
+
+            <table class="admin-table">
+
+                <thead>
+
+                    <tr>
+
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Role</th>
+                        <th>Verification</th>
+                        <th>Registered</th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    <?php while($user = $users->fetch()): ?>
+
+                        <tr>
+
+                            <td>
+                                #<?= (int)$user['id']; ?>
+                            </td>
+
+                            <td>
+                                <strong>
+                                    <?= htmlspecialchars($user['fullname']); ?>
+                                </strong>
+                            </td>
+
+                            <td>
+                                <?= htmlspecialchars($user['email']); ?>
+                            </td>
+
+                            <td>
+                                <?= htmlspecialchars(
+                                    $user['phone'] ?? 'Not provided'
+                                ); ?>
+                            </td>
+
+                            <td>
+
+                                <span class="user-role-badge role-<?= htmlspecialchars($user['role']); ?>">
+
+                                    <?= htmlspecialchars(
+                                        ucfirst($user['role'])
+                                    ); ?>
+
+                                </span>
+
+                            </td>
+
+                            <td>
+
+                                <span class="verification-status verification-status-<?= htmlspecialchars($user['verification_status']); ?>">
+
+                                    <?= htmlspecialchars(
+                                        ucfirst($user['verification_status'])
+                                    ); ?>
+
+                                </span>
+
+                            </td>
+
+                            <td>
+                                <?= htmlspecialchars($user['created_at']); ?>
+                            </td>
+
+                        </tr>
+
+                    <?php endwhile; ?>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    <?php endif; ?>
+
+</div>
+
+<?php include '../includes/footer.php'; ?>
