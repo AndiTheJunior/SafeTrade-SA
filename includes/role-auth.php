@@ -2,19 +2,16 @@
 
 function requireRole($role)
 {
-
     if(
         !isset($_SESSION['role']) ||
         $_SESSION['role'] !== $role
     )
     {
-
-        header("Location: dashboard.php");
+        header(
+            "Location: /SafeTrade-SA2/dashboard.php"
+        );
 
         exit();
-
     }
-
 }
-
 ?>

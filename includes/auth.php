@@ -1,17 +1,16 @@
 <?php
 
-session_start();
-
-if(
-!isset($_SESSION['user_id'])
-)
+if(session_status() === PHP_SESSION_NONE)
 {
+    session_start();
+}
 
-header(
-"Location: login.php"
-);
+if(!isset($_SESSION['user_id']))
+{
+    header(
+        "Location: /SafeTrade-SA2/login.php"
+    );
 
-exit();
-
+    exit();
 }
 ?>
